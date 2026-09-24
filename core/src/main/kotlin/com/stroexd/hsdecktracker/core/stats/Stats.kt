@@ -2,6 +2,7 @@ package com.stroexd.hsdecktracker.core.stats
 
 import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.cards.HsClass
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -11,7 +12,34 @@ enum class MatchResult(val displayName: String) {
     DRAW("Unentschieden"),
 }
 
-enum class MatchSource { MANUAL, TRACKER, LOG }
+enum class MatchSource(val displayName: String) {
+    MANUAL("Manuell"),
+    TRACKER("Tracker"),
+    LOG("Automatisch"),
+}
+
+enum class TimelineType {
+    /** Eigene Karte aus dem Deck gezogen */
+    DRAW,
+
+    /** Eigene Karte zurück ins Deck (Mulligan, Effekte) */
+    RETURN,
+
+    /** Karte gezogen, die nicht aus der Deckliste stammt (z. B. generiert) */
+    EXTRA_DRAW,
+
+    /** Vom Gegner gespielte Karte */
+    OPPONENT_PLAY,
+}
+
+/** Ein Ereignis im Partieverlauf – kompakt gespeichert (kurze JSON-Schlüssel). */
+@Serializable
+data class TimelineEvent(
+    @SerialName("t") val turn: Int,
+    @SerialName("k") val type: TimelineType,
+    @SerialName("d") val dbfId: Int? = null,
+    @SerialName("c") val cardId: String? = null,
+)
 
 @Serializable
 data class MatchRecord(
@@ -32,6 +60,8 @@ data class MatchRecord(
     val opponentArchetype: String? = null,
     val source: MatchSource = MatchSource.MANUAL,
     val notes: String = "",
+    /** Zugverlauf (nur bei Partien aus dem Tracker). */
+    val timeline: List<TimelineEvent> = emptyList(),
 )
 
 data class WinRate(val wins: Int = 0, val losses: Int = 0, val draws: Int = 0) {

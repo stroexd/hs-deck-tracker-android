@@ -5,7 +5,6 @@ package com.stroexd.hsdecktracker.ui.stats
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,10 +40,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,17 +78,16 @@ import com.stroexd.hsdecktracker.core.stats.StatsFilter
 import com.stroexd.hsdecktracker.core.stats.WinRate
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.ChipRow
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
 import com.stroexd.hsdecktracker.ui.components.ConfirmDialog
 import com.stroexd.hsdecktracker.ui.components.EmptyState
 import com.stroexd.hsdecktracker.ui.components.SectionHeader
 import com.stroexd.hsdecktracker.ui.components.StatTile
-import com.stroexd.hsdecktracker.ui.formatDuration
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.uiColor
 import com.stroexd.hsdecktracker.ui.theme.winRateColor
-import com.stroexd.hsdecktracker.ui.timeAgo
 import kotlinx.coroutines.launch
 
 private enum class Period(val label: String, val days: Int?) { WEEK("7 Tage", 7), MONTH("30 Tage", 30), ALL("Gesamt", null) }
@@ -101,6 +104,8 @@ fun StatsScreen(navController: NavHostController) {
     var deckMenu by remember { mutableStateOf(false) }
     var showAdd by remember { mutableStateOf(false) }
     var toDelete by remember { mutableStateOf<MatchRecord?>(null) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val snackbar = remember { SnackbarHostState() }
 
     val filtered = remember(matches, period, format, deckId) {
         val since = period.days?.let { System.currentTimeMillis() - it * 24L * 60 * 60 * 1000 }
@@ -119,6 +124,7 @@ fun StatsScreen(navController: NavHostController) {
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Statistik") }) },
+        snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
@@ -127,105 +133,120 @@ fun StatsScreen(navController: NavHostController) {
             )
         },
     ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 96.dp)) {
-            item {
-                ChipRow(Period.entries.toList(), { it == period }, { it.label }, { period = it }, Modifier.padding(top = 8.dp))
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            TabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Übersicht") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Partien (${matches.size})") })
             }
-            item {
-                FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf<GameFormat?>(null, GameFormat.STANDARD, GameFormat.WILD).forEach { f ->
-                        FilterChip(selected = format == f, onClick = { format = f }, label = { Text(f?.displayName ?: "Alle Formate") })
-                    }
-                    Box {
-                        FilterChip(
-                            selected = deckId != null,
-                            onClick = { deckMenu = true },
-                            label = {
-                                Text(
-                                    deckNames.firstOrNull { it.first == deckId }?.second ?: "Alle Decks",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                        )
-                        DropdownMenu(expanded = deckMenu, onDismissRequest = { deckMenu = false }) {
-                            DropdownMenuItem(text = { Text("Alle Decks") }, onClick = { deckId = null; deckMenu = false })
-                            deckNames.forEach { (id, name) ->
-                                DropdownMenuItem(text = { Text(name) }, onClick = { deckId = id; deckMenu = false })
+            if (tab == 1) {
+                MatchHistoryContent(
+                    navController = navController,
+                    initialDeckId = null,
+                    modifier = Modifier.fillMaxSize(),
+                    onMessage = { message -> scope.launch { snackbar.showSnackbar(message) } },
+                )
+                return@Column
+            }
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
+                item {
+                    ChipRow(Period.entries.toList(), { it == period }, { it.label }, { period = it }, Modifier.padding(top = 8.dp))
+                }
+                item {
+                    FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf<GameFormat?>(null, GameFormat.STANDARD, GameFormat.WILD).forEach { f ->
+                            FilterChip(selected = format == f, onClick = { format = f }, label = { Text(f?.displayName ?: "Alle Formate") })
+                        }
+                        Box {
+                            FilterChip(
+                                selected = deckId != null,
+                                onClick = { deckMenu = true },
+                                label = {
+                                    Text(
+                                        deckNames.firstOrNull { it.first == deckId }?.second ?: "Alle Decks",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                            )
+                            DropdownMenu(expanded = deckMenu, onDismissRequest = { deckMenu = false }) {
+                                DropdownMenuItem(text = { Text("Alle Decks") }, onClick = { deckId = null; deckMenu = false })
+                                deckNames.forEach { (id, name) ->
+                                    DropdownMenuItem(text = { Text(name) }, onClick = { deckId = id; deckMenu = false })
+                                }
                             }
                         }
                     }
                 }
-            }
-            if (filtered.isEmpty()) {
+                if (filtered.isEmpty()) {
+                    item {
+                        EmptyState(
+                            icon = Icons.Filled.QueryStats,
+                            title = "Noch keine Partien",
+                            message = "Nutze den Tracker (Siege/Niederlagen werden gespeichert) oder trage Partien manuell ein.",
+                        )
+                    }
+                    return@LazyColumn
+                }
                 item {
-                    EmptyState(
-                        icon = Icons.Filled.QueryStats,
-                        title = "Noch keine Partien",
-                        message = "Nutze den Tracker (Siege/Niederlagen werden gespeichert) oder trage Partien manuell ein.",
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatTile("Siegquote", formatPercent(overall.rate), Modifier.weight(1f), winRateColor(overall.rate))
+                            StatTile("Partien", "${overall.games}", Modifier.weight(1f))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatTile("Bilanz", overall.label, Modifier.weight(1f))
+                            StatTile(
+                                "Serie",
+                                streak?.let { "${it.length}× ${if (it.result == MatchResult.WIN) "S" else "N"}" } ?: "–",
+                                Modifier.weight(1f),
+                                if (streak?.result == MatchResult.WIN) HsColors.Win else if (streak != null) HsColors.Loss else MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatTile("Am Zug", "${formatPercent(first.rate, 0)} (${first.games})", Modifier.weight(1f), winRateColor(first.rate))
+                            StatTile("Mit Münze", "${formatPercent(coin.rate, 0)} (${coin.games})", Modifier.weight(1f), winRateColor(coin.rate))
+                        }
+                    }
+                }
+                if (trend.size >= 3) {
+                    item {
+                        Column(Modifier.padding(horizontal = 16.dp)) {
+                            SectionHeader("Verlauf (gleitend, 10 Partien)")
+                            TrendChart(trend, Modifier.fillMaxWidth().height(140.dp))
+                        }
+                    }
+                }
+                item { SectionHeader("Matchups", Modifier.padding(horizontal = 16.dp)) }
+                items(byClass.entries.toList(), key = { "mu-" + it.key.name }) { (cls, rate) ->
+                    MatchupRow(cls, rate)
+                }
+                if (deckId == null && byDeck.size > 1) {
+                    item { SectionHeader("Decks", Modifier.padding(horizontal = 16.dp)) }
+                    items(byDeck, key = { "deck-" + (it.deckId ?: it.deckName) }) { deckRate ->
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).clip(CircleShape).background(deckRate.playerClass.uiColor))
+                            Spacer(Modifier.width(8.dp))
+                            Text(deckRate.deckName, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                "${deckRate.winRate.label} · ${formatPercent(deckRate.winRate.rate, 0)}",
+                                color = winRateColor(deckRate.winRate.rate),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
+                }
+                item {
+                    SectionHeader("Letzte Partien", Modifier.padding(horizontal = 16.dp)) {
+                        TextButton(onClick = { tab = 1 }) { Text("Alle ${matches.size} anzeigen") }
+                    }
+                }
+                items(filtered.take(5), key = { it.id }) { match ->
+                    MatchRow(
+                        match = match,
+                        onClick = { navController.navigate(Routes.match(match.id)) },
+                        onLongClick = { toDelete = match },
                     )
                 }
-                return@LazyColumn
-            }
-            item {
-                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatTile("Siegquote", formatPercent(overall.rate), Modifier.weight(1f), winRateColor(overall.rate))
-                        StatTile("Partien", "${overall.games}", Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatTile("Bilanz", overall.label, Modifier.weight(1f))
-                        StatTile(
-                            "Serie",
-                            streak?.let { "${it.length}× ${if (it.result == MatchResult.WIN) "S" else "N"}" } ?: "–",
-                            Modifier.weight(1f),
-                            if (streak?.result == MatchResult.WIN) HsColors.Win else if (streak != null) HsColors.Loss else MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatTile("Am Zug", "${formatPercent(first.rate, 0)} (${first.games})", Modifier.weight(1f), winRateColor(first.rate))
-                        StatTile("Mit Münze", "${formatPercent(coin.rate, 0)} (${coin.games})", Modifier.weight(1f), winRateColor(coin.rate))
-                    }
-                }
-            }
-            if (trend.size >= 3) {
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        SectionHeader("Verlauf (gleitend, 10 Partien)")
-                        TrendChart(trend, Modifier.fillMaxWidth().height(140.dp))
-                    }
-                }
-            }
-            item { SectionHeader("Matchups", Modifier.padding(horizontal = 16.dp)) }
-            items(byClass.entries.toList(), key = { "mu-" + it.key.name }) { (cls, rate) ->
-                MatchupRow(cls, rate)
-            }
-            if (deckId == null && byDeck.size > 1) {
-                item { SectionHeader("Decks", Modifier.padding(horizontal = 16.dp)) }
-                items(byDeck, key = { "deck-" + (it.deckId ?: it.deckName) }) { deckRate ->
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).clip(CircleShape).background(deckRate.playerClass.uiColor))
-                        Spacer(Modifier.width(8.dp))
-                        Text(deckRate.deckName, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            "${deckRate.winRate.label} · ${formatPercent(deckRate.winRate.rate, 0)}",
-                            color = winRateColor(deckRate.winRate.rate),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                }
-            }
-            item { SectionHeader("Letzte Partien", Modifier.padding(horizontal = 16.dp)) }
-            items(filtered.take(200), key = { it.id }) { match ->
-                MatchRow(match, onLongClick = { toDelete = match })
-            }
-            item {
-                Text(
-                    "Lange drücken, um eine Partie zu löschen.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp),
-                )
             }
         }
     }
@@ -276,59 +297,6 @@ private fun MatchupRow(cls: HsClass, rate: WinRate) {
             color = winRateColor(rate.rate),
             modifier = Modifier.width(78.dp),
         )
-    }
-}
-
-@Composable
-private fun MatchRow(match: MatchRecord, onLongClick: () -> Unit) {
-    val color = when (match.result) {
-        MatchResult.WIN -> HsColors.Win
-        MatchResult.LOSS -> HsColors.Loss
-        MatchResult.DRAW -> HsColors.Draw
-    }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = onLongClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(28.dp).clip(CircleShape).background(color.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                when (match.result) {
-                    MatchResult.WIN -> "S"
-                    MatchResult.LOSS -> "N"
-                    MatchResult.DRAW -> "U"
-                },
-                color = color,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                "${match.deckName.ifBlank { match.playerClass.displayName }} vs. ${match.opponentArchetype ?: match.opponentClass.displayName}",
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                listOfNotNull(
-                    timeAgo(match.timestamp),
-                    match.format.displayName,
-                    match.wentFirst?.let { if (it) "am Zug" else "Münze" },
-                    match.turns?.let { "$it Züge" },
-                    match.durationSeconds?.let { formatDuration(it) },
-                    if (match.source == MatchSource.LOG) "auto" else null,
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Box(Modifier.size(10.dp).clip(CircleShape).background(match.opponentClass.uiColor))
     }
 }
 

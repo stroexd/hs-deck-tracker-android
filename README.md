@@ -39,9 +39,17 @@ Deck-Tracker, Deck-Datenbank und Sammlungsverwaltung für Hearthstone – inspir
 - Sieg/Niederlage speichern, Zug und Münze werden erfasst
 - **Automatisches Tracking (experimentell):** liest `Power.log`/`Decks.log` von Hearthstone (wie HDT). Benötigt Zugriff auf `Android/data/com.blizzard.wtcg.hearthstone/files` – ab Android 11 auf vielen Geräten gesperrt.
 
+### Match-History (wie „My Replays“ bei HSReplay)
+- Alle Partien, nach Tagen gruppiert mit Tagesbilanz
+- Suche (Deck, Archetyp, Gegnerkarte, Notiz) und Filter nach Ergebnis, Format, Deck, Gegnerklasse, Zeitraum
+- Detailansicht je Partie: Ergebnis, Deck, Gegner & vermutetes Meta-Deck, Reihenfolge, Züge, Dauer,
+  gespielte Gegnerkarten, eigene gezogene Karten und **Zugverlauf** („Replay light“ aus dem Tracker)
+- Partien bearbeiten (Ergebnis, Gegner, Archetyp, Notiz), löschen, teilen, als CSV exportieren
+- „Alle Partien mit diesem Deck“ direkt aus der Deck-Ansicht
+
 ### Statistik (wie „My Stats“ bei HSReplay)
 - Siegquote gesamt, pro Deck, pro Gegnerklasse (Matchups), am Zug vs. Münze, Serien
-- Verlaufsdiagramm, Partienliste, manuelle Einträge
+- Verlaufsdiagramm, manuelle Einträge
 - Backup & Wiederherstellung aller Daten
 
 ## Installation

@@ -39,6 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -181,6 +182,7 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
                 collection = collection,
                 matches = matches.filter { it.deckId == deck.id },
                 onCardClick = { selectedCard = it },
+                onShowMatches = { navController.navigate(Routes.matches(deck.id)) },
                 header = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         FilledTonalButton(
@@ -267,6 +269,7 @@ fun LazyListScope.deckDetailContent(
     onCardClick: (Card) -> Unit,
     header: @Composable () -> Unit,
     extraInfo: (@Composable () -> Unit)? = null,
+    onShowMatches: (() -> Unit)? = null,
 ) {
     item(key = "header") {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -291,7 +294,7 @@ fun LazyListScope.deckDetailContent(
                 onCardClick = onCardClick,
             )
             DeckSummaryCard(data.summary, data.expectedSize)
-            if (matches.isNotEmpty()) DeckStatsCard(matches)
+            if (matches.isNotEmpty()) DeckStatsCard(matches, onShowMatches)
         }
     }
     item(key = "cards-header") {
@@ -309,7 +312,7 @@ fun LazyListScope.deckDetailContent(
 }
 
 @Composable
-private fun DeckStatsCard(matches: List<MatchRecord>) {
+private fun DeckStatsCard(matches: List<MatchRecord>, onShowMatches: (() -> Unit)?) {
     val overall = StatsCalculator.overall(matches)
     val byClass = StatsCalculator.byOpponentClass(matches)
     M3Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
@@ -328,6 +331,9 @@ private fun DeckStatsCard(matches: List<MatchRecord>) {
                     Spacer(Modifier.weight(1f))
                     Text("${rate.label} · ${formatPercent(rate.rate, 0)}", color = winRateColor(rate.rate), style = MaterialTheme.typography.bodySmall)
                 }
+            }
+            if (onShowMatches != null) {
+                TextButton(onClick = onShowMatches) { Text("Alle ${matches.size} Partien mit diesem Deck") }
             }
         }
     }

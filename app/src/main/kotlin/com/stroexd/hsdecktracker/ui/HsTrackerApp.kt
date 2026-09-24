@@ -39,6 +39,8 @@ import com.stroexd.hsdecktracker.ui.decks.DecksScreen
 import com.stroexd.hsdecktracker.ui.meta.MetaDeckDetailScreen
 import com.stroexd.hsdecktracker.ui.meta.MetaScreen
 import com.stroexd.hsdecktracker.ui.settings.SettingsScreen
+import com.stroexd.hsdecktracker.ui.stats.MatchDetailScreen
+import com.stroexd.hsdecktracker.ui.stats.MatchHistoryScreen
 import com.stroexd.hsdecktracker.ui.stats.StatsScreen
 import com.stroexd.hsdecktracker.ui.tracker.TrackerScreen
 
@@ -55,12 +57,16 @@ object Routes {
     const val TRACKER = "tracker"
     const val SETTINGS = "settings"
     const val CRAFT_CHECK = "craftcheck"
+    const val MATCHES = "matches?deck={deck}"
+    const val MATCH = "match/{id}"
 
     fun deck(id: String) = "deck/${Uri.encode(id)}"
     fun builder(id: String? = null, cls: HsClass? = null, format: GameFormat? = null) =
         "builder?id=${Uri.encode(id.orEmpty())}&cls=${cls?.name.orEmpty()}&fmt=${format?.name.orEmpty()}"
     fun metaDeck(format: GameFormat, id: String) = "metadeck/${format.name}/${Uri.encode(id)}"
     fun set(set: String) = "set/${Uri.encode(set)}"
+    fun matches(deckId: String? = null) = "matches?deck=${Uri.encode(deckId.orEmpty())}"
+    fun match(id: String) = "match/${Uri.encode(id)}"
 }
 
 private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
@@ -165,6 +171,15 @@ fun HsTrackerApp(
             composable(Routes.TRACKER) { TrackerScreen(navController) }
             composable(Routes.SETTINGS) { SettingsScreen(navController) }
             composable(Routes.CRAFT_CHECK) { CraftCheckScreen(navController) }
+            composable(
+                Routes.MATCHES,
+                arguments = listOf(navArgument("deck") { type = NavType.StringType; defaultValue = "" }),
+            ) { entry ->
+                MatchHistoryScreen(navController, entry.arguments?.getString("deck")?.takeIf { it.isNotBlank() })
+            }
+            composable(Routes.MATCH, arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
+                MatchDetailScreen(navController, entry.arguments?.getString("id").orEmpty())
+            }
         }
     }
 }

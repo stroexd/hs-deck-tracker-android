@@ -7,6 +7,8 @@ import com.stroexd.hsdecktracker.core.stats.DrawOdds
 import com.stroexd.hsdecktracker.core.stats.MatchRecord
 import com.stroexd.hsdecktracker.core.stats.MatchResult
 import com.stroexd.hsdecktracker.core.stats.MatchSource
+import com.stroexd.hsdecktracker.core.stats.TimelineEvent
+import com.stroexd.hsdecktracker.core.stats.TimelineType
 
 /**
  * Zustand einer laufenden Partie im Tracker. Unveränderlich – jede Aktion liefert einen neuen Zustand.
@@ -31,6 +33,8 @@ data class TrackerState(
     val wentFirst: Boolean? = null,
     val startedAt: Long,
     val autoTracked: Boolean = false,
+    /** Verlauf der Partie (Ziehen, Zurückmischen, Gegnerkarten) für die Match-History. */
+    val timeline: List<TimelineEvent> = emptyList(),
 ) {
     val initialCount: Int get() = deckCards.values.sum()
     val remainingCount: Int get() = remaining.values.sum()
@@ -40,15 +44,27 @@ data class TrackerState(
 
     fun nextDrawChance(dbfId: Int): Double = DrawOdds.nextDraw(remainingCount, remainingOf(dbfId))
 
+    private fun event(type: TimelineType, dbfId: Int? = null, cardId: String? = null) =
+        TimelineEvent(turn, type, dbfId, cardId)
+
     fun draw(dbfId: Int): TrackerState {
         val left = remainingOf(dbfId)
         if (left <= 0) return this
-        return copy(remaining = remaining + (dbfId to left - 1), drawHistory = drawHistory + dbfId)
+        return copy(
+            remaining = remaining + (dbfId to left - 1),
+            drawHistory = drawHistory + dbfId,
+            timeline = timeline + event(TimelineType.DRAW, dbfId),
+        )
     }
 
     fun undoLastDraw(): TrackerState {
         val last = drawHistory.lastOrNull() ?: return this
-        return copy(remaining = remaining + (last to remainingOf(last) + 1), drawHistory = drawHistory.dropLast(1))
+        val index = timeline.indexOfLast { it.type == TimelineType.DRAW && it.dbfId == last }
+        return copy(
+            remaining = remaining + (last to remainingOf(last) + 1),
+            drawHistory = drawHistory.dropLast(1),
+            timeline = if (index >= 0) timeline.toMutableList().apply { removeAt(index) } else timeline,
+        )
     }
 
     /** Karte zurück ins Deck (Mulligan, „Mische ins Deck“ …), höchstens bis zur ursprünglichen Anzahl. */
@@ -58,16 +74,29 @@ data class TrackerState(
         if (left >= original) return this
         val index = drawHistory.lastIndexOf(dbfId)
         val history = if (index >= 0) drawHistory.toMutableList().apply { removeAt(index) } else drawHistory
-        return copy(remaining = remaining + (dbfId to left + 1), drawHistory = history)
+        return copy(
+            remaining = remaining + (dbfId to left + 1),
+            drawHistory = history,
+            timeline = timeline + event(TimelineType.RETURN, dbfId),
+        )
     }
 
-    fun addExtraDraw(cardId: String): TrackerState = copy(extraDraws = extraDraws + cardId)
+    fun addExtraDraw(cardId: String): TrackerState =
+        copy(extraDraws = extraDraws + cardId, timeline = timeline + event(TimelineType.EXTRA_DRAW, cardId = cardId))
 
-    fun addOpponentCard(dbfId: Int): TrackerState = copy(opponentCards = opponentCards + dbfId)
+    fun addOpponentCard(dbfId: Int): TrackerState =
+        copy(opponentCards = opponentCards + dbfId, timeline = timeline + event(TimelineType.OPPONENT_PLAY, dbfId))
 
-    fun removeOpponentCardAt(index: Int): TrackerState =
-        if (index !in opponentCards.indices) this
-        else copy(opponentCards = opponentCards.toMutableList().apply { removeAt(index) })
+    fun removeOpponentCardAt(index: Int): TrackerState {
+        if (index !in opponentCards.indices) return this
+        // Das index-te Gegner-Ereignis im Verlauf entfernen
+        var seen = -1
+        val eventIndex = timeline.indexOfFirst { it.type == TimelineType.OPPONENT_PLAY && ++seen == index }
+        return copy(
+            opponentCards = opponentCards.toMutableList().apply { removeAt(index) },
+            timeline = if (eventIndex >= 0) timeline.toMutableList().apply { removeAt(eventIndex) } else timeline,
+        )
+    }
 
     fun withOpponentClass(cls: HsClass): TrackerState = copy(opponentClass = cls)
 
@@ -87,6 +116,7 @@ data class TrackerState(
         turn = 1,
         wentFirst = null,
         startedAt = now,
+        timeline = emptyList(),
     )
 
     fun toMatchRecord(
@@ -108,6 +138,7 @@ data class TrackerState(
         opponentCards = opponentCards,
         opponentArchetype = opponentArchetype,
         source = source,
+        timeline = timeline,
     )
 
     companion object {
