@@ -65,6 +65,13 @@ class CollectionRepository(dir: File, private val clock: () -> Long = System::cu
         store.update { it.withNormalCount(dbfId, count).copy(updatedAt = clock()) }
     }
 
+    /** Setzt mehrere normale Anzahlen auf einmal (z. B. „ganzes Set besitzen“). */
+    suspend fun setNormalCounts(counts: Map<Int, Int>) {
+        store.update { current ->
+            counts.entries.fold(current) { acc, (id, count) -> acc.withNormalCount(id, count) }.copy(updatedAt = clock())
+        }
+    }
+
     suspend fun setDust(dust: Int) {
         store.update { it.copy(dust = dust.coerceAtLeast(0)) }
     }

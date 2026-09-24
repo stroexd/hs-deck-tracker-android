@@ -1,5 +1,6 @@
 package com.stroexd.hsdecktracker.core.cards
 
+import com.stroexd.hsdecktracker.core.util.normalizeForSearch
 import kotlinx.serialization.Serializable
 
 /**
@@ -67,6 +68,17 @@ data class Card(
     val plainText: String get() = cleanCardText(text)
 
     val plainFlavor: String get() = cleanCardText(flavor)
+
+    /** Normalisierter Suchtext (Name, Text, Stämme, Mechaniken) – einmalig berechnet. */
+    val searchText: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        buildString {
+            append(normalizeForSearch(name)).append(' ')
+            append(normalizeForSearch(plainText)).append(' ')
+            tribes.forEach { append(it.lowercase()).append(' ') }
+            mechanics.forEach { append(it.lowercase()).append(' ') }
+            spellSchool?.let { append(it.lowercase()) }
+        }
+    }
 }
 
 private val tagRegex = Regex("<[^>]+>")

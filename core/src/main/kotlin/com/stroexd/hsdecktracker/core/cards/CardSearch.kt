@@ -67,13 +67,7 @@ object CardSearch {
     }
 
     private fun matchesTerms(card: Card, terms: List<String>): Boolean {
-        val haystack = buildString {
-            append(normalizeForSearch(card.name)).append(' ')
-            append(normalizeForSearch(card.plainText)).append(' ')
-            card.tribes.forEach { append(it.lowercase()).append(' ') }
-            card.mechanics.forEach { append(it.lowercase()).append(' ') }
-            card.spellSchool?.let { append(it.lowercase()) }
-        }
+        val haystack = card.searchText
         return terms.all { it in haystack }
     }
 }
