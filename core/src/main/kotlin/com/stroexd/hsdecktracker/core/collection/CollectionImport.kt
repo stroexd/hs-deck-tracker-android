@@ -189,7 +189,7 @@ object CollectionImporter {
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("//") }
         if (lines.isEmpty()) return "Text"
         val delimiter = detectDelimiter(lines)
-        val header = delimiter?.let { parseHeader(splitCsv(lines.first(), it)) }
+        val header = delimiter?.let { d -> parseHeader(splitCsv(lines.first(), d))?.let { it to d } }
         val body = if (header != null) lines.drop(1) else lines
         for (line in body) {
             val dustMatch = dustLineRegex.find(line)
@@ -197,14 +197,15 @@ object CollectionImporter {
                 acc.dust = dustMatch.groupValues[1].toInt()
                 continue
             }
-            if (header != null && delimiter != null) {
-                val cols = splitCsv(line, delimiter)
-                val id = cols.getOrNull(header.idColumn)?.takeIf { it.isNotBlank() } ?: continue
+            if (header != null) {
+                val (columns, headerDelimiter) = header
+                val cols = splitCsv(line, headerDelimiter)
+                val id = cols.getOrNull(columns.idColumn)?.takeIf { it.isNotBlank() } ?: continue
                 val owned = OwnedCard(
-                    normal = header.countColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 1,
-                    golden = header.goldenColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 0,
-                    diamond = header.diamondColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 0,
-                    signature = header.signatureColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 0,
+                    normal = columns.countColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 1,
+                    golden = columns.goldenColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 0,
+                    diamond = columns.diamondColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 0,
+                    signature = columns.signatureColumn?.let { cols.getOrNull(it)?.trim()?.toIntOrNull() } ?: 0,
                 )
                 acc.add(id, owned)
             } else {
