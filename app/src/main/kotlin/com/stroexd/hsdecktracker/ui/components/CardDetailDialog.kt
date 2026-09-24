@@ -50,6 +50,7 @@ fun CardDetailDialog(
     onOwnedChange: ((Int) -> Unit)? = null,
     copiesInDeck: Int? = null,
     deckSize: Int = 30,
+    metaInfo: String? = null,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         M3Card(
@@ -93,6 +94,7 @@ fun CardDetailDialog(
                     KeyValue("Herstellen", card.howToEarn ?: if (card.set in CardSets.freeSets) "Kostenlos (Kernset)" else "Nicht herstellbar")
                 }
                 if (card.artist.isNotBlank()) KeyValue("Künstler", card.artist)
+                if (metaInfo != null) KeyValue("Meta", metaInfo)
 
                 if (copiesInDeck != null && copiesInDeck > 0) {
                     HorizontalDivider(Modifier.padding(vertical = 10.dp))

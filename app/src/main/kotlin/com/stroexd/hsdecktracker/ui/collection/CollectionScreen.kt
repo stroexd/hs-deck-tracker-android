@@ -71,12 +71,16 @@ import com.stroexd.hsdecktracker.core.collection.CollectionStats
 import com.stroexd.hsdecktracker.core.collection.CollectionSummary
 import com.stroexd.hsdecktracker.core.collection.CraftingCalculator
 import com.stroexd.hsdecktracker.core.collection.SetProgress
+import com.stroexd.hsdecktracker.core.meta.CraftRecommendation
+import com.stroexd.hsdecktracker.core.meta.MetaCardStats
 import com.stroexd.hsdecktracker.core.meta.MetaDeck
 import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.Routes
+import com.stroexd.hsdecktracker.ui.components.CardTile
 import com.stroexd.hsdecktracker.ui.components.ChipRow
+import com.stroexd.hsdecktracker.ui.components.CollectionCardDialog
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
 import com.stroexd.hsdecktracker.ui.components.ConfirmDialog
 import com.stroexd.hsdecktracker.ui.components.CraftCostLabel
@@ -112,6 +116,7 @@ fun CollectionScreen(navController: NavHostController) {
     var importResult by remember { mutableStateOf<CollectionImportResult?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     var pendingExport by remember { mutableStateOf<String?>(null) }
+    var detail by remember { mutableStateOf<com.stroexd.hsdecktracker.core.cards.Card?>(null) }
 
     fun runImport(text: String) {
         scope.launch {
@@ -158,6 +163,16 @@ fun CollectionScreen(navController: NavHostController) {
             .sortedWith(compareBy({ it.second.dustCost }, { -(it.first.winRate ?: 0.0) }))
             .distinctBy { it.first.displayName }
             .take(5)
+    }
+
+    val recommendations by rememberComputed(metaState.snapshots[GameFormat.STANDARD], db, collection, settings.coreSetOwned, initial = emptyList<CraftRecommendation>()) {
+        MetaCardStats.craftRecommendations(
+            metaState.snapshots[GameFormat.STANDARD]?.decks.orEmpty(),
+            collection,
+            db,
+            settings.collectionOptions,
+            limit = 10,
+        )
     }
 
     Scaffold(
@@ -287,6 +302,25 @@ fun CollectionScreen(navController: NavHostController) {
                     }
                 }
             }
+            if (!collection.isEmpty && recommendations.isNotEmpty()) {
+                item { SectionHeader("Lohnt sich herzustellen (Standard-Meta)") }
+                items(recommendations, key = { "rec-" + it.card.dbfId }) { rec ->
+                    CardTile(
+                        card = rec.card,
+                        name = rec.card.name,
+                        cost = rec.card.cost,
+                        count = rec.missing,
+                        height = 48.dp,
+                        subtitle = buildString {
+                            append("${formatPercent(rec.popularity.overallShare, 0)} der Meta-Spiele")
+                            if (rec.completesDecks > 0) append(" · macht ${rec.completesDecks} Deck(s) komplett")
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp),
+                        onClick = { detail = rec.card },
+                        trailing = { DustLabel(rec.dustCost, Modifier.padding(horizontal = 8.dp)) },
+                    )
+                }
+            }
             item {
                 Column {
                     SectionHeader("Sets")
@@ -338,6 +372,7 @@ fun CollectionScreen(navController: NavHostController) {
             confirmButton = { TextButton(onClick = { importResult = null }) { Text("OK") } },
         )
     }
+    detail?.let { card -> CollectionCardDialog(card = card, onDismiss = { detail = null }) }
     if (confirmClear) {
         ConfirmDialog(
             title = "Sammlung leeren?",
