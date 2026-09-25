@@ -5,17 +5,11 @@ import com.stroexd.hsdecktracker.core.collection.CollectionOptions
 import com.stroexd.hsdecktracker.core.collection.CraftingCalculator
 import com.stroexd.hsdecktracker.core.util.normalizeForSearch
 
-enum class Ownership(val displayName: String) {
-    ALL("Alle"),
-    OWNED("Besessen"),
-    MISSING("Fehlend"),
-    INCOMPLETE("Unvollständig"),
-}
+enum class Ownership { ALL, OWNED, MISSING, INCOMPLETE }
 
 data class CardFilter(
     val query: String = "",
     val classes: Set<HsClass> = emptySet(),
-    /** Manakosten; 7 steht für „7+“. */
     val costs: Set<Int> = emptySet(),
     val rarities: Set<Rarity> = emptySet(),
     val types: Set<CardType> = emptySet(),
@@ -27,7 +21,6 @@ data class CardFilter(
 }
 
 object CardSearch {
-
     fun filter(
         cards: List<Card>,
         filter: CardFilter,

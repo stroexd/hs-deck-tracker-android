@@ -4,44 +4,48 @@ import com.stroexd.hsdecktracker.core.cards.FormatRules
 import com.stroexd.hsdecktracker.core.collection.CollectionOptions
 import kotlinx.serialization.Serializable
 
-enum class MetaSourceType(val displayName: String) {
-    HSREPLAY("HSReplay.net (inoffiziell)"),
-    CUSTOM_URL("Eigene Deck-Code-Liste (URL)"),
-}
+enum class MetaSourceType { HSREPLAY, CUSTOM_URL }
 
-enum class RankRange(val apiValue: String, val displayName: String) {
-    BRONZE_THROUGH_GOLD("BRONZE_THROUGH_GOLD", "Bronze – Gold"),
-    DIAMOND_THROUGH_LEGEND("DIAMOND_THROUGH_LEGEND", "Diamant – Legende"),
-    LEGEND_ONLY("LEGEND_ONLY", "Nur Legende"),
-    ALL("ALL", "Alle Ränge"),
-}
+/** Names match HSReplay's API values. */
+enum class RankRange { BRONZE_THROUGH_GOLD, DIAMOND_THROUGH_LEGEND, LEGEND_ONLY, ALL }
 
-enum class TimeRange(val apiValue: String, val displayName: String) {
-    CURRENT_PATCH("CURRENT_PATCH", "Aktueller Patch"),
-    LAST_3_DAYS("LAST_3_DAYS", "Letzte 3 Tage"),
-    LAST_7_DAYS("LAST_7_DAYS", "Letzte 7 Tage"),
-    LAST_14_DAYS("LAST_14_DAYS", "Letzte 14 Tage"),
-}
+enum class TimeRange { CURRENT_PATCH, LAST_3_DAYS, LAST_7_DAYS, LAST_14_DAYS }
 
-val cardLocales: List<Pair<String, String>> = listOf(
-    "deDE" to "Deutsch",
-    "enUS" to "English",
-    "frFR" to "Français",
-    "esES" to "Español",
-    "itIT" to "Italiano",
-    "plPL" to "Polski",
-    "ptBR" to "Português (BR)",
-    "ruRU" to "Русский",
-    "koKR" to "한국어",
-    "zhCN" to "简体中文",
-    "jaJP" to "日本語",
-)
+/** Hearthstone client languages with their own names. */
+object GameLocales {
+    const val AUTO = "auto"
+    const val ENGLISH = "enUS"
+
+    val all: List<Pair<String, String>> = listOf(
+        "enUS" to "English",
+        "deDE" to "Deutsch",
+        "frFR" to "Français",
+        "esES" to "Español (EU)",
+        "esMX" to "Español (AL)",
+        "itIT" to "Italiano",
+        "plPL" to "Polski",
+        "ptBR" to "Português (BR)",
+        "ruRU" to "Русский",
+        "koKR" to "한국어",
+        "jaJP" to "日本語",
+        "zhCN" to "简体中文",
+        "zhTW" to "繁體中文",
+        "thTH" to "ไทย",
+    )
+
+    fun fromLanguage(language: String): String = when (language.lowercase()) {
+        "pt" -> "ptBR"
+        "zh" -> "zhCN"
+        else -> all.firstOrNull { it.first.startsWith(language.lowercase()) }?.first ?: ENGLISH
+    }
+}
 
 @Serializable
 data class AppSettings(
-    val cardLocale: String = "deDE",
+    /** [GameLocales.AUTO] follows the language of the Hearthstone client. */
+    val language: String = GameLocales.AUTO,
+    val detectedGameLocale: String? = null,
     val coreSetOwned: Boolean = true,
-    /** Set → ist Standard (überschreibt die eingebaute Einschätzung). */
     val standardSetOverrides: Map<String, Boolean> = emptyMap(),
     val metaSource: MetaSourceType = MetaSourceType.HSREPLAY,
     val metaRankRange: RankRange = RankRange.BRONZE_THROUGH_GOLD,
@@ -50,13 +54,17 @@ data class AppSettings(
     val overlayOpacity: Float = 0.92f,
     val overlayShowOdds: Boolean = true,
     val overlayWidthDp: Int = 230,
-    /** Beendete Partien automatisch in der Match-History speichern. */
     val autoRecordMatches: Boolean = true,
-    /** Zuletzt erkannte Texte im Overlay anzeigen (zur Kontrolle der Bilderkennung). */
     val showRecognitionDebug: Boolean = false,
-    /** Erkannte Texte und einige Bildschirmfotos lokal speichern, um die Erkennung zu verbessern. */
     val recordDiagnostics: Boolean = false,
 ) {
     val formatRules: FormatRules get() = FormatRules(standardSetOverrides)
     val collectionOptions: CollectionOptions get() = CollectionOptions(coreSetOwned = coreSetOwned)
+
+    /** Card data and app language: the chosen one, otherwise Hearthstone's, otherwise the device's. */
+    fun gameLocale(deviceLanguage: String): String = when {
+        language != GameLocales.AUTO -> language
+        detectedGameLocale != null -> detectedGameLocale
+        else -> GameLocales.fromLanguage(deviceLanguage)
+    }
 }

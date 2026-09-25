@@ -51,12 +51,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
 import com.stroexd.hsdecktracker.core.cards.CardFilter
 import com.stroexd.hsdecktracker.core.cards.CardSearch
@@ -70,17 +74,12 @@ import com.stroexd.hsdecktracker.core.tracker.TrackerState
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import com.stroexd.hsdecktracker.ui.components.CardTile
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
+import com.stroexd.hsdecktracker.ui.label
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.uiColor
 import com.stroexd.hsdecktracker.ui.theme.winRateColor
 import kotlinx.coroutines.delay
 
-/**
- * Tracker-Oberfläche – wird im In-App-Tracker und im Overlay über Hearthstone verwendet.
- *
- * Eigenes Deck: Antippen = gezogen, lange drücken = zurück ins Deck.
- * Gegner: Klasse wählen, gespielte Karten erfassen, Deck-Vorhersage aus den Meta-Decks.
- */
 @Composable
 fun TrackerPanel(
     state: TrackerState,
@@ -99,37 +98,35 @@ fun TrackerPanel(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val rowHeight = if (compact) 30.dp else 40.dp
     Column(modifier) {
-        // Kopfzeile
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    state.deckName,
+                    state.deckName.ifBlank { stringResource(R.string.detecting_deck) },
                     style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "Im Deck ${state.remainingCount}/${state.initialCount} · Zug ${state.turn}" +
-                        when (state.wentFirst) {
-                            true -> " · am Zug"
-                            false -> " · Münze"
-                            null -> ""
-                        } + if (state.autoTracked) " · auto" else "",
+                    listOfNotNull(
+                        stringResource(R.string.tracker_status, state.remainingCount, state.initialCount, state.turn),
+                        state.wentFirst?.let { stringResource(if (it) R.string.went_first_short else R.string.coin_short) },
+                        if (state.autoTracked) stringResource(R.string.auto_short) else null,
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            SmallIconButton(Icons.Filled.Remove, "Zug zurück", compact) { onUpdate { it.previousTurn() } }
-            SmallIconButton(Icons.Filled.Add, "Nächster Zug", compact) { onUpdate { it.nextTurn() } }
-            SmallIconButton(Icons.AutoMirrored.Filled.Undo, "Rückgängig", compact) { onUpdate { it.undoLastDraw() } }
+            SmallIconButton(Icons.Filled.Remove, stringResource(R.string.previous_turn), compact) { onUpdate { it.previousTurn() } }
+            SmallIconButton(Icons.Filled.Add, stringResource(R.string.next_turn), compact) { onUpdate { it.nextTurn() } }
+            SmallIconButton(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo), compact) { onUpdate { it.undoLastDraw() } }
         }
         TabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Deck (${state.remainingCount})", fontSize = if (compact) 12.sp else 14.sp) })
+            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.deck_with_count, state.remainingCount), fontSize = if (compact) 12.sp else 14.sp) })
             Tab(
                 selected = tab == 1,
                 onClick = { tab = 1 },
-                text = { Text("Gegner (${state.opponentCards.size})", fontSize = if (compact) 12.sp else 14.sp) },
+                text = { Text(stringResource(R.string.opponent_with_count, state.opponentCards.size), fontSize = if (compact) 12.sp else 14.sp) },
             )
         }
         Box(Modifier.weight(1f, fill = !compact)) {
@@ -139,7 +136,6 @@ fun TrackerPanel(
                 OpponentTab(state, db, predictions, compact, rowHeight, onUpdate, onTextInputChange)
             }
         }
-        // Ergebnis
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -149,24 +145,24 @@ fun TrackerPanel(
                 colors = ButtonDefaults.buttonColors(containerColor = HsColors.Win.copy(alpha = 0.85f)),
                 contentPadding = PaddingValues(horizontal = 8.dp),
                 modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
-            ) { Text("Sieg", fontSize = if (compact) 12.sp else 14.sp) }
+            ) { Text(stringResource(R.string.win), fontSize = if (compact) 12.sp else 14.sp) }
             Button(
                 onClick = { onFinish(MatchResult.LOSS) },
                 colors = ButtonDefaults.buttonColors(containerColor = HsColors.Loss.copy(alpha = 0.85f)),
                 contentPadding = PaddingValues(horizontal = 8.dp),
                 modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
-            ) { Text("Niederlage", fontSize = if (compact) 12.sp else 14.sp, maxLines = 1) }
+            ) { Text(stringResource(R.string.loss), fontSize = if (compact) 12.sp else 14.sp, maxLines = 1) }
             OutlinedButton(
                 onClick = onNewGame,
                 contentPadding = PaddingValues(horizontal = 8.dp),
                 modifier = Modifier.height(if (compact) 34.dp else 42.dp),
-            ) { Text("Neu", fontSize = if (compact) 12.sp else 14.sp) }
+            ) { Text(stringResource(R.string.new_game), fontSize = if (compact) 12.sp else 14.sp) }
         }
     }
 }
 
 @Composable
-private fun SmallIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, compact: Boolean, onClick: () -> Unit) {
+private fun SmallIconButton(icon: ImageVector, description: String, compact: Boolean, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(if (compact) 32.dp else 44.dp)) {
         Icon(icon, contentDescription = description, modifier = Modifier.size(if (compact) 18.dp else 24.dp))
     }
@@ -177,7 +173,7 @@ private fun DeckTab(
     state: TrackerState,
     db: CardDatabase,
     showOdds: Boolean,
-    rowHeight: androidx.compose.ui.unit.Dp,
+    rowHeight: Dp,
     onUpdate: ((TrackerState) -> TrackerState) -> Unit,
     decks: List<Deck>,
     onSelectDeck: ((Deck) -> Unit)?,
@@ -220,7 +216,7 @@ private fun DeckTab(
         if (state.extraDraws.isNotEmpty()) {
             item(key = "extra") {
                 Text(
-                    "Zusätzlich gezogen: " + state.extraDraws.mapNotNull { db.byCardId(it)?.name ?: it }.joinToString(),
+                    stringResource(R.string.extra_drawn, state.extraDraws.joinToString { db.byCardId(it)?.name ?: it }),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(6.dp),
@@ -230,12 +226,11 @@ private fun DeckTab(
     }
 }
 
-/** Deck noch unbekannt: bisher gesehene Karten zeigen und manuelle Auswahl anbieten. */
 @Composable
 private fun UnknownDeck(
     state: TrackerState,
     db: CardDatabase,
-    rowHeight: androidx.compose.ui.unit.Dp,
+    rowHeight: Dp,
     decks: List<Deck>,
     onSelectDeck: ((Deck) -> Unit)?,
 ) {
@@ -249,18 +244,14 @@ private fun UnknownDeck(
     ) {
         item(key = "info") {
             Text(
-                if (state.autoTracked) {
-                    "Deck wird erkannt … Sobald ein paar Karten zu einem deiner Decks (oder einem Meta-Deck) passen, erscheint hier die Deckliste."
-                } else {
-                    "Kein Deck gewählt."
-                },
+                stringResource(if (state.autoTracked) R.string.detecting_deck_hint else R.string.no_deck_selected),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(6.dp),
             )
         }
         if (state.extraDraws.isNotEmpty()) {
             item(key = "seen-header") {
-                Text("Bisher gesehen", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 6.dp))
+                Text(stringResource(R.string.seen_so_far), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 6.dp))
             }
             items(state.extraDraws.size, key = { "seen-$it" }) { index ->
                 val card = db.byCardId(state.extraDraws[index])
@@ -270,7 +261,7 @@ private fun UnknownDeck(
         if (onSelectDeck != null && decks.isNotEmpty()) {
             item(key = "choose") {
                 TextButton(onClick = { choosing = !choosing }) {
-                    Text(if (choosing) "Auswahl schließen" else "Deck selbst wählen")
+                    Text(stringResource(if (choosing) R.string.close_selection else R.string.choose_deck_manually))
                 }
             }
             if (choosing) {
@@ -303,7 +294,7 @@ private fun OpponentTab(
     db: CardDatabase,
     predictions: List<DeckPrediction>,
     compact: Boolean,
-    rowHeight: androidx.compose.ui.unit.Dp,
+    rowHeight: Dp,
     onUpdate: ((TrackerState) -> TrackerState) -> Unit,
     onTextInputChange: (Boolean) -> Unit,
 ) {
@@ -332,7 +323,7 @@ private fun OpponentTab(
         item(key = "class") {
             if (!state.opponentClass.isPlayable || pickClass) {
                 Column {
-                    Text("Klasse des Gegners", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.opponent_class_title), style = MaterialTheme.typography.labelMedium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         HsClass.playable.forEach { cls ->
                             FilterChip(
@@ -341,7 +332,7 @@ private fun OpponentTab(
                                     onUpdate { it.withOpponentClass(cls) }
                                     pickClass = false
                                 },
-                                label = { Text(cls.displayName, fontSize = if (compact) 11.sp else 13.sp) },
+                                label = { Text(cls.label(), fontSize = if (compact) 11.sp else 13.sp) },
                             )
                         }
                     }
@@ -350,7 +341,7 @@ private fun OpponentTab(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ClassBadge(state.opponentClass)
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { pickClass = true }) { Text("ändern") }
+                    TextButton(onClick = { pickClass = true }) { Text(stringResource(R.string.change)) }
                 }
             }
         }
@@ -368,11 +359,11 @@ private fun OpponentTab(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        placeholder = { Text("Gespielte Karte suchen …") },
+                        placeholder = { Text(stringResource(R.string.search_played_card)) },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         modifier = Modifier.weight(1f).focusRequester(focusRequester),
                     )
-                    IconButton(onClick = { closeSearch() }) { Icon(Icons.Filled.Close, contentDescription = "Suche schließen") }
+                    IconButton(onClick = { closeSearch() }) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close_search)) }
                 }
             } else {
                 TextButton(onClick = {
@@ -381,7 +372,7 @@ private fun OpponentTab(
                 }) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
-                    Text("Gespielte Karte hinzufügen")
+                    Text(stringResource(R.string.add_played_card))
                 }
             }
         }
@@ -401,13 +392,13 @@ private fun OpponentTab(
         }
         if (state.opponentCards.isNotEmpty()) {
             item(key = "played-header") {
-                Text("Gespielt (antippen zum Entfernen)", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
+                Text(stringResource(R.string.played_tap_to_remove), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
             }
             items(state.opponentCards.size, key = { "played-$it" }) { index ->
                 val card = db.byDbfId(state.opponentCards[index])
                 CardTile(
                     card = card,
-                    name = card?.name ?: "Karte ${state.opponentCards[index]}",
+                    name = card?.name ?: stringResource(R.string.card_number, state.opponentCards[index]),
                     cost = card?.cost ?: 0,
                     count = 1,
                     height = rowHeight,
@@ -425,7 +416,7 @@ private fun OpponentTab(
                 ) {
                     Column(Modifier.padding(8.dp)) {
                         Text(
-                            if (state.opponentCards.isEmpty()) "Häufigstes Deck" else "Vermutetes Deck",
+                            stringResource(if (state.opponentCards.isEmpty()) R.string.most_common_deck else R.string.likely_deck),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -441,13 +432,15 @@ private fun OpponentTab(
                         }
                         if (state.opponentCards.isNotEmpty()) {
                             Text(
-                                "${top.matchedCards} von ${top.seenCards} gesehenen Karten passen" +
-                                    predictions.drop(1).joinToString("") { " · Alternativ: ${it.deck.displayName}" },
+                                (
+                                    listOf(stringResource(R.string.seen_cards_match, top.matchedCards, top.seenCards)) +
+                                        predictions.drop(1).map { stringResource(R.string.alternative, it.deck.displayName) }
+                                    ).joinToString(" · "),
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         }
                         Text(
-                            "Noch zu erwarten (antippen = gespielt):",
+                            stringResource(R.string.still_expected),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp),

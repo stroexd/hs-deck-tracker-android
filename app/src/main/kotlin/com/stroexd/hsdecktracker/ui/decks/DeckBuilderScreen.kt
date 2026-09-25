@@ -53,7 +53,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -71,6 +74,10 @@ import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckAnalysis
 import com.stroexd.hsdecktracker.core.deck.DeckSource
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.defaultDeckName
+import com.stroexd.hsdecktracker.ui.label
+import com.stroexd.hsdecktracker.ui.labelRes
+import com.stroexd.hsdecktracker.ui.localized
 import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.CardTile
 import com.stroexd.hsdecktracker.ui.components.ChipRow
@@ -96,10 +103,11 @@ class DeckBuilderViewModel(
     deckId: String?,
     initialClass: HsClass?,
     initialFormat: GameFormat?,
+    private val defaultName: (HsClass) -> String,
 ) : ViewModel() {
     private val existing: Deck? = deckId?.let { container.decks.get(it) }
     private var original: Deck = existing ?: Deck(
-        name = "${(initialClass ?: HsClass.MAGE).displayName}-Deck",
+        name = defaultName(initialClass ?: HsClass.MAGE),
         heroClass = initialClass ?: HsClass.MAGE,
         format = initialFormat ?: GameFormat.STANDARD,
         source = DeckSource.USER,
@@ -126,7 +134,7 @@ class DeckBuilderViewModel(
     fun setFormat(format: GameFormat) = _draft.update { it.copy(format = format) }
 
     suspend fun save(): Deck {
-        val saved = container.decks.upsert(_draft.value.copy(name = _draft.value.name.ifBlank { "Neues Deck" }))
+        val saved = container.decks.upsert(_draft.value.copy(name = _draft.value.name.ifBlank { defaultName(_draft.value.heroClass) }))
         original = saved
         _draft.value = saved
         return saved
@@ -141,7 +149,10 @@ fun DeckBuilderScreen(
     initialFormat: GameFormat?,
 ) {
     val container = LocalAppContainer.current
-    val vm: DeckBuilderViewModel = viewModel { DeckBuilderViewModel(container, deckId, initialClass, initialFormat) }
+    val context = LocalContext.current
+    val vm: DeckBuilderViewModel = viewModel {
+        DeckBuilderViewModel(container, deckId, initialClass, initialFormat, defaultDeckName(context.applicationContext.localized()))
+    }
     val scope = rememberCoroutineScope()
     val deck by vm.draft.collectAsStateWithLifecycle()
     val cardState by container.cards.state.collectAsStateWithLifecycle()
@@ -181,9 +192,9 @@ fun DeckBuilderScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (vm.isNew) "Neues Deck" else "Deck bearbeiten") },
+                title = { Text(stringResource(if (vm.isNew) R.string.new_deck else R.string.edit_deck)) },
                 navigationIcon = {
-                    IconButton(onClick = { leave() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück") }
+                    IconButton(onClick = { leave() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back)) }
                 },
                 actions = {
                     IconButton(onClick = {
@@ -192,7 +203,7 @@ fun DeckBuilderScreen(
                             navController.popBackStack()
                             if (deckId == null) navController.navigate(Routes.deck(saved.id))
                         }
-                    }) { Icon(Icons.Filled.Check, contentDescription = "Speichern") }
+                    }) { Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.save)) }
                 },
             )
         },
@@ -205,13 +216,13 @@ fun DeckBuilderScreen(
                     Box(Modifier.size(10.dp).clip(CircleShape).background(deck.heroClass.uiColor))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "${deck.cardCount}/$expected Karten",
+                        stringResource(R.string.cards_of, deck.cardCount, expected),
                         fontWeight = FontWeight.Bold,
                         color = if (deck.cardCount == expected) HsColors.Win else MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(Modifier.weight(1f))
                     if (!collection.isEmpty && !analysis.isComplete) {
-                        Text("Fehlt: ", style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.missing_prefix), style = MaterialTheme.typography.labelMedium)
                         DustLabel(analysis.dustCost)
                         Spacer(Modifier.width(12.dp))
                     }
@@ -221,19 +232,19 @@ fun DeckBuilderScreen(
                             navController.popBackStack()
                             if (deckId == null) navController.navigate(Routes.deck(saved.id))
                         }
-                    }) { Text("Speichern") }
+                    }) { Text(stringResource(R.string.save)) }
                 }
             }
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Karten") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Deck (${deck.cardCount})") })
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.cards)) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.deck_with_count, deck.cardCount)) })
             }
             if (tab == 0) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    SearchField(query, { query = it }, placeholder = "Karte, Text, Stamm …")
+                    SearchField(query, { query = it }, placeholder = stringResource(R.string.card_search_placeholder))
                 }
                 ChipRow(
                     options = (0..7).toList(),
@@ -242,8 +253,8 @@ fun DeckBuilderScreen(
                     onClick = { c -> costs = if (c in costs) costs - c else costs + c },
                 )
                 Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(selected = showAllClasses, onClick = { showAllClasses = !showAllClasses }, label = { Text("Alle Klassen") })
-                    FilterChip(selected = onlyOwned, onClick = { onlyOwned = !onlyOwned }, label = { Text("Nur besessene") })
+                    FilterChip(selected = showAllClasses, onClick = { showAllClasses = !showAllClasses }, label = { Text(stringResource(R.string.all_classes)) })
+                    FilterChip(selected = onlyOwned, onClick = { onlyOwned = !onlyOwned }, label = { Text(stringResource(R.string.only_owned)) })
                 }
                 LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                     items(candidates, key = { it.dbfId }) { card ->
@@ -263,14 +274,14 @@ fun DeckBuilderScreen(
                             OutlinedTextField(
                                 value = deck.name,
                                 onValueChange = vm::rename,
-                                label = { Text("Deckname") },
+                                label = { Text(stringResource(R.string.deck_name)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             ChipRow(
                                 options = listOf(GameFormat.STANDARD, GameFormat.WILD, GameFormat.TWIST),
                                 isSelected = { it == deck.format },
-                                label = { it.displayName },
+                                label = { context.getString(it.labelRes()) },
                                 onClick = vm::setFormat,
                                 contentPadding = PaddingValues(0.dp),
                             )
@@ -291,9 +302,9 @@ fun DeckBuilderScreen(
                             onClick = entry.card?.let { card -> { detailCard = card } },
                             trailing = {
                                 Row {
-                                    IconButton(onClick = { vm.remove(entry.dbfId) }) { Icon(Icons.Filled.Remove, contentDescription = "Entfernen") }
+                                    IconButton(onClick = { vm.remove(entry.dbfId) }) { Icon(Icons.Filled.Remove, contentDescription = stringResource(R.string.remove)) }
                                     entry.card?.let { card ->
-                                        IconButton(onClick = { vm.add(card) }) { Icon(Icons.Filled.Add, contentDescription = "Hinzufügen") }
+                                        IconButton(onClick = { vm.add(card) }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add)) }
                                     }
                                 }
                             },
@@ -309,9 +320,9 @@ fun DeckBuilderScreen(
     }
     if (confirmLeave) {
         ConfirmDialog(
-            title = "Änderungen verwerfen?",
-            message = "Das Deck wurde noch nicht gespeichert.",
-            confirmLabel = "Verwerfen",
+            title = stringResource(R.string.discard_changes_title),
+            message = stringResource(R.string.discard_changes_message),
+            confirmLabel = stringResource(R.string.discard),
             onConfirm = { navController.popBackStack() },
             onDismiss = { confirmLeave = false },
         )
@@ -335,14 +346,14 @@ private fun BuilderCardRow(card: Card, inDeck: Int, owned: Int?, onAdd: () -> Un
                 Box(Modifier.size(8.dp).clip(CircleShape).background(card.rarityType.uiColor))
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    listOfNotNull(card.cardType.displayName, card.hsClass.takeIf { !card.isNeutral }?.displayName).joinToString(" · "),
+                    listOfNotNull(card.cardType.label(), card.hsClass.takeIf { !card.isNeutral }?.label()).joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (owned != null) {
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Besitz ${minOf(owned, card.maxCopies)}/${card.maxCopies}",
+                        stringResource(R.string.owned_of, minOf(owned, card.maxCopies), card.maxCopies),
                         style = MaterialTheme.typography.labelSmall,
                         color = if (owned >= card.maxCopies) HsColors.Win else if (owned > 0) HsColors.Warning else HsColors.Loss,
                     )
@@ -360,7 +371,7 @@ private fun BuilderCardRow(card: Card, inDeck: Int, owned: Int?, onAdd: () -> Un
             Spacer(Modifier.width(6.dp))
         }
         FilledTonalIconButton(onClick = onAdd, enabled = inDeck < card.maxCopies) {
-            Icon(Icons.Filled.Add, contentDescription = "Hinzufügen")
+            Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.add))
         }
     }
     Spacer(Modifier.height(1.dp))

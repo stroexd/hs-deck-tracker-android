@@ -50,6 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,6 +85,7 @@ import com.stroexd.hsdecktracker.ui.components.SectionHeader
 import com.stroexd.hsdecktracker.ui.components.deckCardItems
 import com.stroexd.hsdecktracker.ui.copyToClipboard
 import com.stroexd.hsdecktracker.ui.shareText
+import com.stroexd.hsdecktracker.ui.label
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.winRateColor
 import com.stroexd.hsdecktracker.ui.toast
@@ -107,10 +111,10 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(deck?.name ?: "Deck", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text(deck?.name ?: stringResource(R.string.deck), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
@@ -118,27 +122,27 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
                         IconButton(onClick = { scope.launch { container.decks.upsert(deck.copy(favorite = !deck.favorite)) } }) {
                             Icon(
                                 if (deck.favorite) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                contentDescription = "Favorit",
+                                contentDescription = stringResource(R.string.favorite),
                                 tint = if (deck.favorite) HsColors.Gold else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(onClick = { context.copyToClipboard("Deck-Code", deck.deckCode(), "Deck-Code kopiert – in Hearthstone „Neues Deck“ wählen") }) {
-                            Icon(Icons.Filled.ContentCopy, contentDescription = "Deck-Code kopieren")
+                        IconButton(onClick = { context.copyToClipboard("Deck code", deck.deckCode(), context.getString(R.string.deck_code_copied_hint)) }) {
+                            Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(R.string.copy_deck_code))
                         }
-                        IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Mehr") }
+                        IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more)) }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Bearbeiten") },
+                                text = { Text(stringResource(R.string.edit)) },
                                 leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
                                 onClick = { menuOpen = false; navController.navigate(Routes.builder(id = deck.id)) },
                             )
                             DropdownMenuItem(
-                                text = { Text("Teilen") },
+                                text = { Text(stringResource(R.string.share)) },
                                 leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
                                 onClick = { menuOpen = false; context.shareText(deck.name, DeckAnalysis.exportText(deck, cardState.db)) },
                             )
                             DropdownMenuItem(
-                                text = { Text("Karten zur Sammlung hinzufügen") },
+                                text = { Text(stringResource(R.string.add_cards_to_collection)) },
                                 leadingIcon = { Icon(Icons.Filled.Inventory2, contentDescription = null) },
                                 onClick = {
                                     menuOpen = false
@@ -146,12 +150,12 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
                                         val all = deck.cards.toMutableMap()
                                         deck.sideboards.forEach { all.merge(it.dbfId, it.count, Int::plus) }
                                         container.collection.addDeck(all)
-                                        context.toast("Alle Karten als besessen markiert")
+                                        context.toast(context.getString(R.string.all_cards_marked_owned))
                                     }
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Löschen") },
+                                text = { Text(stringResource(R.string.delete)) },
                                 leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                                 onClick = { menuOpen = false; confirmDelete = true },
                             )
@@ -164,8 +168,8 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
         if (deck == null) {
             EmptyState(
                 icon = Icons.Filled.SearchOff,
-                title = "Deck nicht gefunden",
-                message = "Das Deck wurde gelöscht oder existiert nicht mehr.",
+                title = stringResource(R.string.deck_not_found),
+                message = stringResource(R.string.deck_not_found_message),
                 modifier = Modifier.padding(padding),
             )
             return@Scaffold
@@ -194,7 +198,7 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
                         ) {
                             Icon(Icons.Filled.PlayArrow, contentDescription = null)
                             Spacer(Modifier.width(6.dp))
-                            Text("Tracker")
+                            Text(stringResource(R.string.tracker))
                         }
                         FilledTonalButton(
                             onClick = {
@@ -205,7 +209,7 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
                         ) {
                             Icon(Icons.Filled.Layers, contentDescription = null)
                             Spacer(Modifier.width(6.dp))
-                            Text("Overlay")
+                            Text(stringResource(R.string.overlay))
                         }
                     }
                 },
@@ -224,9 +228,9 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
 
     if (confirmDelete && deck != null) {
         ConfirmDialog(
-            title = "Deck löschen?",
-            message = "„${deck.name}“ wird entfernt. Gespielte Partien bleiben in der Statistik erhalten.",
-            confirmLabel = "Löschen",
+            title = stringResource(R.string.delete_deck_title),
+            message = stringResource(R.string.delete_deck_message, deck.name),
+            confirmLabel = stringResource(R.string.delete),
             onConfirm = {
                 scope.launch {
                     container.decks.delete(deck.id)
@@ -238,7 +242,6 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
     }
 }
 
-/** Vorberechnete Daten für die Deck-Detailansicht. */
 data class DeckDetailData(
     val analysis: CraftAnalysis,
     val summary: DeckSummary,
@@ -257,9 +260,6 @@ fun rememberDeckDetailData(deck: Deck, db: CardDatabase, collection: CardCollect
         )
     }
 
-/**
- * Gemeinsamer Inhalt der Deck-Detailansicht (eigene Decks und Meta-Decks).
- */
 fun LazyListScope.deckDetailContent(
     deck: Deck,
     db: CardDatabase,
@@ -275,7 +275,7 @@ fun LazyListScope.deckDetailContent(
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 ClassBadge(deck.heroClass)
-                Text(deck.format.displayName, style = MaterialTheme.typography.labelLarge, modifier = Modifier.align(Alignment.CenterVertically))
+                Text(deck.format.label(), style = MaterialTheme.typography.labelLarge, modifier = Modifier.align(Alignment.CenterVertically))
                 deck.archetype?.let {
                     Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.align(Alignment.CenterVertically))
                 }
@@ -298,13 +298,13 @@ fun LazyListScope.deckDetailContent(
         }
     }
     item(key = "cards-header") {
-        SectionHeader("Karten", Modifier.padding(horizontal = 16.dp))
+        SectionHeader(stringResource(R.string.cards), Modifier.padding(horizontal = 16.dp))
     }
     deckCardItems(deck.cards, deck.sideboards, db, data.analysis, onCardClick)
     if (deck.notes.isNotBlank()) {
         item(key = "notes") {
             Column(Modifier.padding(16.dp)) {
-                SectionHeader("Notizen")
+                SectionHeader(stringResource(R.string.notes))
                 Text(deck.notes, style = MaterialTheme.typography.bodyMedium)
             }
         }
@@ -318,7 +318,7 @@ private fun DeckStatsCard(matches: List<MatchRecord>, onShowMatches: (() -> Unit
     M3Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Deine Bilanz", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.your_record), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text(
                     "${overall.label} · ${formatPercent(overall.rate)}",
                     color = winRateColor(overall.rate),
@@ -333,7 +333,7 @@ private fun DeckStatsCard(matches: List<MatchRecord>, onShowMatches: (() -> Unit
                 }
             }
             if (onShowMatches != null) {
-                TextButton(onClick = onShowMatches) { Text("Alle ${matches.size} Partien mit diesem Deck") }
+                TextButton(onClick = onShowMatches) { Text(pluralStringResource(R.plurals.all_games_with_deck, matches.size, matches.size)) }
             }
         }
     }

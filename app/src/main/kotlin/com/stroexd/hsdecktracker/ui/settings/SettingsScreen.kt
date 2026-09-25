@@ -54,29 +54,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.stroexd.hsdecktracker.BuildConfig
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.core.cards.CardSets
 import com.stroexd.hsdecktracker.core.data.AppSettings
 import com.stroexd.hsdecktracker.core.data.Backup
 import com.stroexd.hsdecktracker.core.data.BackupData
+import com.stroexd.hsdecktracker.core.data.GameLocales
 import com.stroexd.hsdecktracker.core.data.MetaSourceType
 import com.stroexd.hsdecktracker.core.data.RankRange
 import com.stroexd.hsdecktracker.core.data.TimeRange
-import com.stroexd.hsdecktracker.core.data.cardLocales
 import com.stroexd.hsdecktracker.core.util.formatNumber
-import com.stroexd.hsdecktracker.vision.DiagnosticsRecorder
 import com.stroexd.hsdecktracker.overlay.OverlayLauncher
 import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.components.SectionHeader
 import com.stroexd.hsdecktracker.ui.formatDateTime
+import com.stroexd.hsdecktracker.ui.labelRes
+import com.stroexd.hsdecktracker.ui.message
 import com.stroexd.hsdecktracker.ui.readText
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.writeText
+import com.stroexd.hsdecktracker.vision.DiagnosticsRecorder
 import kotlinx.coroutines.launch
 
 @Composable
@@ -90,7 +94,7 @@ fun SettingsScreen(navController: NavHostController) {
     val startOverlay = rememberTrackingStarter()
     val recognition by container.recognition.collectAsStateWithLifecycle()
     var showSets by rememberSaveable { mutableStateOf(false) }
-    var localeMenu by remember { mutableStateOf(false) }
+    val gameLocale by container.gameLocale.collectAsStateWithLifecycle()
     var customUrl by rememberSaveable(settings.metaCustomUrl) { mutableStateOf(settings.metaCustomUrl) }
     var pendingBackup by remember { mutableStateOf<String?>(null) }
 
@@ -103,8 +107,8 @@ fun SettingsScreen(navController: NavHostController) {
         if (uri != null && content != null) {
             scope.launch {
                 runCatching { context.writeText(uri, content) }
-                    .onSuccess { snackbar.showSnackbar("Backup gespeichert") }
-                    .onFailure { snackbar.showSnackbar("Backup fehlgeschlagen: ${it.message}") }
+                    .onSuccess { snackbar.showSnackbar(context.getString(R.string.backup_saved)) }
+                    .onFailure { snackbar.showSnackbar(context.getString(R.string.backup_failed, it.message.orEmpty())) }
             }
         }
         pendingBackup = null
@@ -120,9 +124,9 @@ fun SettingsScreen(navController: NavHostController) {
                     container.settings.update { data.settings }
                     data
                 }.onSuccess {
-                    snackbar.showSnackbar("Backup geladen: ${it.decks.size} Decks, ${it.matches.size} Partien")
+                    snackbar.showSnackbar(context.getString(R.string.backup_restored, it.decks.size, it.matches.size))
                 }.onFailure {
-                    snackbar.showSnackbar("Backup konnte nicht gelesen werden: ${it.message}")
+                    snackbar.showSnackbar(context.getString(R.string.backup_read_failed, it.message.orEmpty()))
                 }
             }
         }
@@ -131,10 +135,10 @@ fun SettingsScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Einstellungen") },
+                title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
             )
@@ -142,90 +146,86 @@ fun SettingsScreen(navController: NavHostController) {
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
-            // ------------------------------------------------------------ Kartendaten
             item {
-                SettingsCard("Kartendaten") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Sprache der Karten", modifier = Modifier.weight(1f))
-                        Box {
-                            OutlinedButton(onClick = { localeMenu = true }) {
-                                Text(cardLocales.firstOrNull { it.first == settings.cardLocale }?.second ?: settings.cardLocale)
-                            }
-                            DropdownMenu(expanded = localeMenu, onDismissRequest = { localeMenu = false }) {
-                                cardLocales.forEach { (code, label) ->
-                                    DropdownMenuItem(text = { Text(label) }, onClick = {
-                                        localeMenu = false
-                                        update { it.copy(cardLocale = code) }
-                                    })
-                                }
-                            }
-                        }
-                    }
+                SettingsCard(stringResource(R.string.language_and_cards)) {
+                    LanguagePicker(
+                        selected = settings.language,
+                        onSelect = { code -> update { it.copy(language = code) } },
+                    )
                     Text(
-                        buildString {
-                            append("${formatNumber(cardState.db.deckCards.size)} Karten geladen")
-                            cardState.lastUpdated?.let { append(" · Stand ${formatDateTime(it)}") }
-                            if (cardState.loading) append(" · lädt …")
+                        if (settings.language != GameLocales.AUTO) {
+                            stringResource(R.string.language_ui_note)
+                        } else if (settings.detectedGameLocale != null) {
+                            stringResource(R.string.language_auto_detected, localeName(settings.detectedGameLocale))
+                        } else {
+                            stringResource(R.string.language_auto_pending, localeName(gameLocale))
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    cardState.error?.let { Text(it, color = HsColors.Loss, style = MaterialTheme.typography.bodySmall) }
-                    FilledTonalButton(onClick = { container.refreshCards() }, enabled = !cardState.loading) { Text("Jetzt aktualisieren") }
                     Text(
-                        "Quelle: HearthstoneJSON (hearthstonejson.com). Kartenbilder: art.hearthstonejson.com.",
+                        stringResource(R.string.cards_loaded, formatNumber(cardState.db.deckCards.size)) +
+                            cardState.lastUpdated?.let { stringResource(R.string.cards_updated_at, formatDateTime(it)) }.orEmpty() +
+                            if (cardState.loading) stringResource(R.string.cards_loading_suffix) else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    cardState.error?.let { Text(it.message(), color = HsColors.Loss, style = MaterialTheme.typography.bodySmall) }
+                    FilledTonalButton(onClick = { container.refreshCards() }, enabled = !cardState.loading) {
+                        Text(stringResource(R.string.update_now))
+                    }
+                    Text(
+                        stringResource(R.string.card_data_source),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            // ------------------------------------------------------------ Sammlung
             item {
-                SettingsCard("Sammlung & Staubkosten") {
+                SettingsCard(stringResource(R.string.collection_and_dust)) {
                     SwitchRow(
-                        title = "Kernset als besessen werten",
-                        subtitle = "Kernset-Karten sind für alle Spieler kostenlos (über Klassenstufen freigeschaltet).",
+                        title = stringResource(R.string.core_set_owned),
+                        subtitle = stringResource(R.string.core_set_owned_hint),
                         checked = settings.coreSetOwned,
                         onChange = { v -> update { it.copy(coreSetOwned = v) } },
                     )
                 }
             }
-            // ------------------------------------------------------------ Meta
             item {
-                SettingsCard("Meta-Decks") {
-                    Text("Quelle", style = MaterialTheme.typography.labelLarge)
+                SettingsCard(stringResource(R.string.meta_decks)) {
+                    Text(stringResource(R.string.source), style = MaterialTheme.typography.labelLarge)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         MetaSourceType.entries.forEach { source ->
                             FilterChip(
                                 selected = settings.metaSource == source,
                                 onClick = { update { it.copy(metaSource = source) } },
-                                label = { Text(source.displayName) },
+                                label = { Text(stringResource(source.labelRes())) },
                             )
                         }
                     }
                     if (settings.metaSource == MetaSourceType.HSREPLAY) {
-                        Text("Rangbereich", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.rank_range), style = MaterialTheme.typography.labelLarge)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             RankRange.entries.forEach { range ->
                                 FilterChip(
                                     selected = settings.metaRankRange == range,
                                     onClick = { update { it.copy(metaRankRange = range) } },
-                                    label = { Text(range.displayName) },
+                                    label = { Text(stringResource(range.labelRes())) },
                                 )
                             }
                         }
-                        Text("Zeitraum", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.time_range), style = MaterialTheme.typography.labelLarge)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             TimeRange.entries.forEach { range ->
                                 FilterChip(
                                     selected = settings.metaTimeRange == range,
                                     onClick = { update { it.copy(metaTimeRange = range) } },
-                                    label = { Text(range.displayName) },
+                                    label = { Text(stringResource(range.labelRes())) },
                                 )
                             }
                         }
                         Text(
-                            "Die Daten stammen von HSReplay.net (öffentliche Website-Schnittstelle, inoffiziell). Einige Filter sind dort nur mit Premium verfügbar – im Zweifel „Bronze – Gold“ und „Aktueller Patch“ verwenden.",
+                            stringResource(R.string.hsreplay_note),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -233,31 +233,32 @@ fun SettingsScreen(navController: NavHostController) {
                         OutlinedTextField(
                             value = customUrl,
                             onValueChange = { customUrl = it },
-                            label = { Text("URL einer Textdatei mit Deck-Codes") },
+                            label = { Text(stringResource(R.string.custom_url_label)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Button(onClick = { update { it.copy(metaCustomUrl = customUrl.trim()) } }) { Text("Übernehmen") }
+                        Button(onClick = { update { it.copy(metaCustomUrl = customUrl.trim()) } }) { Text(stringResource(R.string.apply)) }
                         Text(
-                            "Z. B. ein GitHub-Gist (Raw-Link) mit Deck-Codes. Zeilen „### Name“ vor einem Code werden als Deckname verwendet.",
+                            stringResource(R.string.custom_url_hint),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
-            // ------------------------------------------------------------ Standard-Sets
             item {
-                SettingsCard("Standard-Format") {
+                SettingsCard(stringResource(R.string.standard_format)) {
                     Row(
                         Modifier.fillMaxWidth().clickable { showSets = !showSets },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Welche Sets sind Standard?")
+                            Text(stringResource(R.string.which_sets_standard))
                             Text(
-                                "Nach einer Rotation hier anpassen. Standard: " +
+                                stringResource(
+                                    R.string.standard_sets_hint,
                                     cardState.db.sets.filter { settings.formatRules.isStandardSet(it) }.joinToString { CardSets.displayName(it) },
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -265,7 +266,7 @@ fun SettingsScreen(navController: NavHostController) {
                         Icon(if (showSets) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
                     }
                     if (settings.standardSetOverrides.isNotEmpty()) {
-                        TextButton(onClick = { update { it.copy(standardSetOverrides = emptyMap()) } }) { Text("Auf Voreinstellung zurücksetzen") }
+                        TextButton(onClick = { update { it.copy(standardSetOverrides = emptyMap()) } }) { Text(stringResource(R.string.reset_to_default)) }
                     }
                 }
             }
@@ -273,26 +274,25 @@ fun SettingsScreen(navController: NavHostController) {
                 items(cardState.db.sets, key = { "set-$it" }) { set ->
                     SwitchRow(
                         title = CardSets.displayName(set),
-                        subtitle = if (set in settings.standardSetOverrides) "manuell festgelegt" else null,
+                        subtitle = if (set in settings.standardSetOverrides) stringResource(R.string.set_manually) else null,
                         checked = settings.formatRules.isStandardSet(set),
                         onChange = { v -> update { it.copy(standardSetOverrides = it.standardSetOverrides + (set to v)) } },
                         modifier = Modifier.padding(horizontal = 8.dp),
                     )
                 }
             }
-            // ------------------------------------------------------------ Overlay
             item {
-                SettingsCard("Overlay") {
+                SettingsCard(stringResource(R.string.overlay)) {
                     var opacity by remember(settings.overlayOpacity) { mutableFloatStateOf(settings.overlayOpacity) }
                     var width by remember(settings.overlayWidthDp) { mutableFloatStateOf(settings.overlayWidthDp.toFloat()) }
-                    Text("Transparenz: ${(opacity * 100).toInt()} %")
+                    Text(stringResource(R.string.opacity, (opacity * 100).toInt()))
                     Slider(
                         value = opacity,
                         onValueChange = { opacity = it },
                         onValueChangeFinished = { update { it.copy(overlayOpacity = opacity) } },
                         valueRange = 0.4f..1f,
                     )
-                    Text("Breite: ${width.toInt()} dp")
+                    Text(stringResource(R.string.overlay_width, width.toInt()))
                     Slider(
                         value = width,
                         onValueChange = { width = it },
@@ -300,82 +300,79 @@ fun SettingsScreen(navController: NavHostController) {
                         valueRange = 180f..360f,
                     )
                     SwitchRow(
-                        title = "Ziehwahrscheinlichkeit anzeigen",
+                        title = stringResource(R.string.show_draw_odds),
                         checked = settings.overlayShowOdds,
                         onChange = { v -> update { it.copy(overlayShowOdds = v) } },
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = { startOverlay() }) { Text("Overlay starten") }
-                        OutlinedButton(onClick = { OverlayLauncher.stop(context) }) { Text("Beenden") }
+                        FilledTonalButton(onClick = { startOverlay() }) { Text(stringResource(R.string.start_overlay)) }
+                        OutlinedButton(onClick = { OverlayLauncher.stop(context) }) { Text(stringResource(R.string.stop)) }
                     }
                     if (!OverlayLauncher.canDrawOverlays(context)) {
                         TextButton(onClick = { OverlayLauncher.requestOverlayPermission(context) }) {
-                            Text("Berechtigung „Über anderen Apps einblenden“ erteilen")
+                            Text(stringResource(R.string.grant_overlay_permission))
                         }
                     }
                 }
             }
-            // ------------------------------------------------------------ Automatische Erkennung
             item {
-                SettingsCard("Automatische Erkennung") {
+                SettingsCard(stringResource(R.string.automatic_recognition)) {
                     Text(
-                        "Tippe auf „Spielen“ (Startseite oder App-Symbol lange drücken). Android fragt einmal pro Sitzung nach der " +
-                            "Bildschirmaufnahme – danach erkennt die App selbstständig Spielstart, dein Deck, gezogene Karten, " +
-                            "die Karten des Gegners, Züge und das Ergebnis. Die Texterkennung läuft komplett auf dem Gerät, " +
-                            "es wird nichts hochgeladen. Tipp (Android 14+): „Einzelne App“ → Hearthstone wählen.",
+                        stringResource(R.string.recognition_explained),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
                         if (recognition.active) {
-                            "Status: aktiv · ${recognition.phaseLabel} · ${recognition.frames} Bilder ausgewertet" +
+                            stringResource(R.string.recognition_status_active, stringResource(recognition.phase.labelRes()), recognition.frames) +
                                 if (recognition.frames > 0) {
-                                    " (${recognition.frames - recognition.ocrFrames} unverändert, Texterkennung gespart)"
+                                    stringResource(R.string.recognition_status_saved, recognition.frames - recognition.ocrFrames)
                                 } else {
                                     ""
                                 }
                         } else {
-                            "Status: aus"
+                            stringResource(R.string.recognition_status_off)
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = if (recognition.active) HsColors.Win else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    FilledTonalButton(onClick = { startOverlay() }) { Text(if (recognition.active) "Hearthstone öffnen" else "Spielen & tracken") }
+                    FilledTonalButton(onClick = { startOverlay() }) {
+                        Text(stringResource(if (recognition.active) R.string.open_hearthstone else R.string.play_and_track_button))
+                    }
                     SwitchRow(
-                        title = "Partien automatisch speichern",
-                        subtitle = "Beendete Partien landen mit Zugverlauf in der Match-History.",
+                        title = stringResource(R.string.auto_record),
+                        subtitle = stringResource(R.string.auto_record_hint),
                         checked = settings.autoRecordMatches,
                         onChange = { v -> update { it.copy(autoRecordMatches = v) } },
                     )
                     SwitchRow(
-                        title = "Erkannte Texte im Overlay anzeigen",
-                        subtitle = "Zur Kontrolle, was die Erkennung gerade sieht.",
+                        title = stringResource(R.string.show_recognized_texts),
+                        subtitle = stringResource(R.string.show_recognized_texts_hint),
                         checked = settings.showRecognitionDebug,
                         onChange = { v -> update { it.copy(showRecognitionDebug = v) } },
                     )
                     SwitchRow(
-                        title = "Diagnose aufzeichnen",
-                        subtitle = "Speichert erkannte Texte und einige verkleinerte Bildschirmfotos lokal. Hilft, die Erkennung an dein Gerät anzupassen (wirkt ab dem nächsten Start).",
+                        title = stringResource(R.string.record_diagnostics),
+                        subtitle = stringResource(R.string.record_diagnostics_hint),
                         checked = settings.recordDiagnostics,
                         onChange = { v -> update { it.copy(recordDiagnostics = v) } },
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = {
                             if (!DiagnosticsRecorder.share(context)) {
-                                scope.launch { snackbar.showSnackbar("Noch keine Diagnose aufgezeichnet") }
+                                scope.launch { snackbar.showSnackbar(context.getString(R.string.no_diagnostics)) }
                             }
-                        }) { Text("Diagnose teilen") }
+                        }) { Text(stringResource(R.string.share_diagnostics)) }
                         TextButton(onClick = {
                             DiagnosticsRecorder.clear(context)
-                            scope.launch { snackbar.showSnackbar("Diagnose gelöscht") }
-                        }) { Text("Löschen") }
+                            scope.launch { snackbar.showSnackbar(context.getString(R.string.diagnostics_deleted)) }
+                        }) { Text(stringResource(R.string.delete)) }
                     }
                 }
             }
-            // ------------------------------------------------------------ Backup
             item {
-                SettingsCard("Datensicherung") {
+                SettingsCard(stringResource(R.string.backup)) {
                     Text(
-                        "Decks, Sammlung, Statistik und Einstellungen als JSON-Datei sichern oder wiederherstellen.",
+                        stringResource(R.string.backup_hint),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -390,24 +387,45 @@ fun SettingsScreen(navController: NavHostController) {
                                 ),
                             )
                             exportBackup.launch("hs-deck-tracker-backup.json")
-                        }) { Text("Backup erstellen") }
+                        }) { Text(stringResource(R.string.create_backup)) }
                         OutlinedButton(onClick = { importBackup.launch(arrayOf("application/json", "text/plain", "*/*")) }) {
-                            Text("Wiederherstellen")
+                            Text(stringResource(R.string.restore))
                         }
                     }
                 }
             }
-            // ------------------------------------------------------------ Über
             item {
-                SettingsCard("Über") {
+                SettingsCard(stringResource(R.string.about)) {
                     Text("HS Deck Tracker ${BuildConfig.VERSION_NAME}", fontWeight = FontWeight.Bold)
                     Text(
-                        "Inoffizielles Fan-Projekt. Hearthstone ist eine Marke von Blizzard Entertainment. " +
-                            "Nicht verbunden mit Blizzard, HSReplay.net, HearthSim oder HearthPwn. " +
-                            "Kartendaten: HearthstoneJSON (HearthSim).",
+                        stringResource(R.string.about_text),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+        }
+    }
+}
+
+private fun localeName(code: String): String = GameLocales.all.firstOrNull { it.first == code }?.second ?: code
+
+@Composable
+private fun LanguagePicker(selected: String, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.language_label), modifier = Modifier.weight(1f))
+        Box {
+            OutlinedButton(onClick = { expanded = true }) {
+                Text(if (selected == GameLocales.AUTO) stringResource(R.string.language_auto) else localeName(selected))
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                val options = listOf(GameLocales.AUTO to stringResource(R.string.language_auto)) + GameLocales.all
+                options.forEach { (code, name) ->
+                    DropdownMenuItem(text = { Text(name) }, onClick = {
+                        expanded = false
+                        onSelect(code)
+                    })
                 }
             }
         }

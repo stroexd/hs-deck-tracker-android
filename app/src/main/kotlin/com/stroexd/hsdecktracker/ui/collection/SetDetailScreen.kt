@@ -40,6 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -52,6 +55,7 @@ import com.stroexd.hsdecktracker.core.collection.CraftingCalculator
 import com.stroexd.hsdecktracker.core.collection.OwnedCard
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.labelRes
 import com.stroexd.hsdecktracker.ui.components.CardImage
 import com.stroexd.hsdecktracker.ui.components.ChipRow
 import com.stroexd.hsdecktracker.ui.components.CollectionCardDialog
@@ -63,6 +67,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SetDetailScreen(navController: NavHostController, set: String) {
     val container = LocalAppContainer.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cardState by container.cards.state.collectAsStateWithLifecycle()
     val collection by container.collection.collection.collectAsStateWithLifecycle()
@@ -101,14 +106,14 @@ fun SetDetailScreen(navController: NavHostController, set: String) {
                 title = { Text(CardSets.displayName(set)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
-                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Mehr") }
+                    IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.more)) }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("Alle Karten besitzen (max.)") }, onClick = { menuOpen = false; confirmAll = true })
-                        DropdownMenuItem(text = { Text("Alle Karten entfernen") }, onClick = { menuOpen = false; confirmAll = false })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.own_all_cards)) }, onClick = { menuOpen = false; confirmAll = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.remove_all_cards)) }, onClick = { menuOpen = false; confirmAll = false })
                     }
                 },
             )
@@ -117,12 +122,12 @@ fun SetDetailScreen(navController: NavHostController, set: String) {
         Column(Modifier.fillMaxSize().padding(padding)) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 Text(
-                    "${progress.uniqueOwned}/${progress.uniqueTotal} Karten · ${formatPercent(progress.fraction, 0)} der Exemplare",
+                    stringResource(R.string.set_progress, progress.uniqueOwned, progress.uniqueTotal, formatPercent(progress.fraction, 0)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (progress.dustToComplete > 0) DustLabel(progress.dustToComplete, prefix = "Zum Vervollständigen: ")
+                if (progress.dustToComplete > 0) DustLabel(progress.dustToComplete, prefix = stringResource(R.string.to_complete_prefix))
                 Text(
-                    "Tippen: Anzahl erhöhen (0 → 1 → 2 → 0) · Lange drücken: Details",
+                    stringResource(R.string.set_tap_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -130,7 +135,7 @@ fun SetDetailScreen(navController: NavHostController, set: String) {
             ChipRow(
                 options = Ownership.entries.toList(),
                 isSelected = { it == ownership },
-                label = { it.displayName },
+                label = { context.getString(it.labelRes()) },
                 onClick = { ownership = it },
                 modifier = Modifier.padding(vertical = 4.dp),
             )
@@ -152,7 +157,7 @@ fun SetDetailScreen(navController: NavHostController, set: String) {
                     ) {
                         CardImage(
                             card,
-                            settings.cardLocale,
+                            cardState.db.locale,
                             Modifier.fillMaxWidth().aspectRatio(0.69f).alpha(if (owned == 0) 0.4f else 1f),
                         )
                         Surface(
@@ -179,10 +184,9 @@ fun SetDetailScreen(navController: NavHostController, set: String) {
 
     confirmAll?.let { own ->
         ConfirmDialog(
-            title = if (own) "Ganzes Set besitzen?" else "Set leeren?",
-            message = if (own) "Alle Karten dieses Sets werden mit maximaler Anzahl als besessen markiert."
-            else "Alle normalen Exemplare dieses Sets werden entfernt (goldene bleiben).",
-            confirmLabel = "Ja",
+            title = stringResource(if (own) R.string.own_set_title else R.string.clear_set_title),
+            message = stringResource(if (own) R.string.own_set_message else R.string.clear_set_message),
+            confirmLabel = stringResource(R.string.yes),
             onConfirm = {
                 scope.launch {
                     val counts = cards.associate { card ->

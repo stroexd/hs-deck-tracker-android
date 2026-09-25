@@ -9,10 +9,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Eine per Texterkennung gefundene Zeile. Koordinaten sind auf 0..1 normiert
- * (bezogen auf den Bildschirm im Querformat, links oben = 0/0).
- */
 @Serializable
 data class OcrLine(
     @SerialName("s") val text: String,
@@ -27,23 +23,16 @@ data class OcrLine(
     val height: Float get() = bottom - top
 }
 
-/** Ergebnis der Texterkennung für ein Bildschirmfoto. */
 @Serializable
 data class OcrFrame(
     @SerialName("ts") val timestamp: Long,
     @SerialName("lines") val lines: List<OcrLine>,
-    /** Seitenverhältnis (Breite/Höhe) des Bildschirmfotos, 0 = unbekannt. */
     @SerialName("a") val aspect: Float = 0f,
 )
 
 data class NameMatch(val key: String, val dbfIds: List<Int>, val score: Double)
 
-/**
- * Findet Kartennamen in (fehlerbehafteten) OCR-Texten – exakt oder unscharf (Levenshtein).
- * Namen mehrerer Sprachen können gemischt werden (z. B. deutsche App, englischer Client).
- */
 class CardNameIndex(names: List<Pair<Int, String>>) {
-
     private val byKey: Map<String, List<Int>> = names
         .mapNotNull { (id, name) -> normalize(name).takeIf { it.length >= MIN_LENGTH }?.let { it to id } }
         .groupBy({ it.first }, { it.second })
@@ -53,15 +42,6 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
 
     val size: Int get() = byKey.size
 
-    /**
-     * Beste Übereinstimmung für eine ganze Zeile, oder null.
-     *
-     * Reihenfolge: exakter Name, eindeutig abgeschnittener Name (z. B. von überlappenden Handkarten
-     * verdeckt), unscharfer Abgleich.
-     *
-     * @param preferred dbfIds, die im aktuellen Kontext plausibel sind (erkanntes Deck, Meta-Karten).
-     *   Karten aus dieser Menge werden bevorzugt und mit etwas lockererer Schwelle akzeptiert.
-     */
     fun match(raw: String, preferred: Set<Int> = emptySet()): NameMatch? {
         val key = normalize(raw)
         if (key.length < MIN_LENGTH) return null
@@ -86,7 +66,6 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
                 bestPreferred = candidate
             }
         }
-        // Bevorzugte Karte (aus dem Deck) mit etwas lockererer Schwelle
         val preferredThreshold = if (key.length >= 8) 0.75 else 0.8
         if (bestPreferred != null && bestPreferredScore >= preferredThreshold) {
             return NameMatch(bestPreferred, idsFor(bestPreferred, preferred), bestPreferredScore)
@@ -95,10 +74,8 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
         return if (best != null && bestScore >= threshold) NameMatch(best, byKey.getValue(best), bestScore) else null
     }
 
-    /** Abgeschnittener Name: eindeutiger Namensanfang mit mindestens 60 % der Länge. */
     private fun prefixMatch(key: String, candidates: List<String>, preferred: Set<Int>): NameMatch? {
         if (key.length < PREFIX_MIN_LENGTH) return null
-        // Eindeutig unter allen Namen mit diesem Anfang („Twilight“ passt auf viele Karten → keine)
         val prefixed = candidates.filter { it.length > key.length && it.startsWith(key) }
         if (prefixed.isEmpty()) return null
         val pick = prefixed.singleOrNull() ?: prefixed.filter { isPreferred(it, preferred) }.singleOrNull() ?: return null
@@ -112,10 +89,6 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
     private fun idsFor(key: String, preferred: Set<Int>): List<Int> =
         byKey.getValue(key).sortedByDescending { it in preferred }
 
-    /**
-     * Sucht alle Kartennamen in einer Zeile. Versucht zuerst die ganze Zeile, danach
-     * zusammenhängende Wortgruppen (falls die Erkennung zwei Namen zu einer Zeile verbindet).
-     */
     fun findAll(raw: String, preferred: Set<Int> = emptySet()): List<NameMatch> {
         match(raw, preferred)?.let { return listOf(it) }
         val words = normalize(raw).split(' ').filter { it.isNotBlank() }
@@ -175,65 +148,209 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
     }
 }
 
-/** Texte der Spieloberfläche in mehreren Sprachen (normalisiert: klein, ohne Akzente/Satzzeichen). */
+/** Hearthstone UI texts per client language (normalized: lowercase, no accents or punctuation). */
+private class UiLanguage(
+    val locale: String,
+    val confirm: List<String>,
+    val mulligan: List<String>,
+    val choice: List<String>,
+    val ownTurn: List<String>,
+    val enemyTurn: List<String>,
+    val yourTurn: List<String>,
+    val victory: List<String>,
+    val defeat: List<String>,
+    val tie: List<String>,
+    val coin: List<String>,
+    val extraCard: List<String>,
+    val classes: Map<HsClass, String>,
+) {
+    val all: List<String>
+        get() = confirm + mulligan + choice + ownTurn + enemyTurn + yourTurn + victory + defeat + tie + coin + extraCard + classes.values
+}
+
 object UiKeywords {
-    val confirm = setOf("confirm", "bestatigen", "confirmer", "confirmar", "conferma", "potwierdz", "confirma")
-    val mulligan = setOf(
-        "starting hand", "keep or replace cards", "starthand", "main de depart", "mano inicial", "mano iniziale",
-    )
-    val choice = setOf("choose one", "discover", "wahlt eine", "wahlt eine karte", "entdeckt", "choisissez", "elige una", "scegli")
-    val ownTurn = setOf(
-        "end turn", "your turn", "zug beenden", "zug ende", "du bist am zug", "dein zug", "euer zug", "ihr seid am zug",
-        "fin du tour", "a vous de jouer", "fin de turno", "tu turno", "fine turno", "tocca a te",
-    )
-    val enemyTurn = setOf(
-        "enemy turn", "opponent s turn", "opponents turn", "gegnerischer zug", "gegnerzug", "zug des gegners",
-        "tour adverse", "tour de l adversaire", "turno enemigo", "turno del rival", "turno avversario",
-    )
-    val victory = setOf("victory", "sieg", "victoire", "victoria", "vittoria", "zwyciestwo")
-    val defeat = setOf("defeat", "niederlage", "defaite", "derrota", "sconfitta", "porazka")
-    val tie = setOf("tie", "unentschieden", "egalite", "empate", "pareggio")
-    val coin = setOf("the coin", "die munze", "la piece", "la moneda", "la moneta", "moneta")
+    private val languages = listOf(
+        UiLanguage(
+            locale = "enUS",
+            confirm = listOf("confirm"),
+            mulligan = listOf("starting hand", "keep or replace cards"),
+            choice = listOf("choose one", "discover"),
+            ownTurn = listOf("end turn"),
+            enemyTurn = listOf("enemy turn", "opponent s turn"),
+            yourTurn = listOf("your turn"),
+            victory = listOf("victory"),
+            defeat = listOf("defeat"),
+            tie = listOf("tie"),
+            coin = listOf("the coin"),
+            extraCard = listOf("you get an extra card"),
+            classes = mapOf(
+                HsClass.DEATHKNIGHT to "death knight", HsClass.DEMONHUNTER to "demon hunter", HsClass.DRUID to "druid",
+                HsClass.HUNTER to "hunter", HsClass.MAGE to "mage", HsClass.PALADIN to "paladin", HsClass.PRIEST to "priest",
+                HsClass.ROGUE to "rogue", HsClass.SHAMAN to "shaman", HsClass.WARLOCK to "warlock", HsClass.WARRIOR to "warrior",
+            ),
+        ),
+        UiLanguage(
+            locale = "deDE",
+            confirm = listOf("bestatigen"),
+            mulligan = listOf("starthand", "karten behalten oder ersetzen"),
+            choice = listOf("wahlt eine", "wahlt eine karte"),
+            ownTurn = listOf("zug beenden"),
+            enemyTurn = listOf("gegnerischer zug", "gegnerzug", "zug des gegners"),
+            yourTurn = listOf("euer zug", "ihr seid am zug", "dein zug", "du bist am zug"),
+            victory = listOf("sieg"),
+            defeat = listOf("niederlage"),
+            tie = listOf("unentschieden"),
+            coin = listOf("die munze"),
+            extraCard = listOf("ihr erhaltet eine zusatzliche karte", "du erhaltst eine zusatzliche karte"),
+            classes = mapOf(
+                HsClass.DEATHKNIGHT to "todesritter", HsClass.DEMONHUNTER to "damonenjager", HsClass.DRUID to "druide",
+                HsClass.HUNTER to "jager", HsClass.MAGE to "magier", HsClass.PALADIN to "paladin", HsClass.PRIEST to "priester",
+                HsClass.ROGUE to "schurke", HsClass.SHAMAN to "schamane", HsClass.WARLOCK to "hexenmeister", HsClass.WARRIOR to "krieger",
+            ),
+        ),
+        UiLanguage(
+            locale = "frFR",
+            confirm = listOf("confirmer"),
+            mulligan = listOf("main de depart"),
+            choice = listOf("choisissez"),
+            ownTurn = listOf("fin du tour"),
+            enemyTurn = listOf("tour adverse", "tour de l adversaire"),
+            yourTurn = listOf("a vous de jouer", "votre tour"),
+            victory = listOf("victoire"),
+            defeat = listOf("defaite"),
+            tie = listOf("egalite"),
+            coin = listOf("la piece"),
+            extraCard = emptyList(),
+            classes = mapOf(
+                HsClass.DEATHKNIGHT to "chevalier de la mort", HsClass.DEMONHUNTER to "chasseur de demons", HsClass.DRUID to "druide",
+                HsClass.HUNTER to "chasseur", HsClass.MAGE to "mage", HsClass.PALADIN to "paladin", HsClass.PRIEST to "pretre",
+                HsClass.ROGUE to "voleur", HsClass.SHAMAN to "chaman", HsClass.WARLOCK to "demoniste", HsClass.WARRIOR to "guerrier",
+            ),
+        ),
+        UiLanguage(
+            locale = "esES",
+            confirm = listOf("confirmar"),
+            mulligan = listOf("mano inicial"),
+            choice = listOf("elige una"),
+            ownTurn = listOf("fin de turno", "terminar turno"),
+            enemyTurn = listOf("turno enemigo", "turno del rival"),
+            yourTurn = listOf("tu turno"),
+            victory = listOf("victoria"),
+            defeat = listOf("derrota"),
+            tie = listOf("empate"),
+            coin = listOf("la moneda"),
+            extraCard = emptyList(),
+            classes = mapOf(
+                HsClass.DEATHKNIGHT to "caballero de la muerte", HsClass.DEMONHUNTER to "cazador de demonios", HsClass.DRUID to "druida",
+                HsClass.HUNTER to "cazador", HsClass.MAGE to "mago", HsClass.PALADIN to "paladin", HsClass.PRIEST to "sacerdote",
+                HsClass.ROGUE to "picaro", HsClass.SHAMAN to "chaman", HsClass.WARLOCK to "brujo", HsClass.WARRIOR to "guerrero",
+            ),
+        ),
+        UiLanguage(
+            locale = "itIT",
+            confirm = listOf("conferma"),
+            mulligan = listOf("mano iniziale"),
+            choice = listOf("scegli"),
+            ownTurn = listOf("fine turno"),
+            enemyTurn = listOf("turno avversario"),
+            yourTurn = listOf("tocca a te", "il tuo turno"),
+            victory = listOf("vittoria"),
+            defeat = listOf("sconfitta"),
+            tie = listOf("pareggio"),
+            coin = listOf("la moneta"),
+            extraCard = emptyList(),
+            classes = mapOf(
+                HsClass.DEATHKNIGHT to "cavaliere della morte", HsClass.DEMONHUNTER to "cacciatore di demoni", HsClass.DRUID to "druido",
+                HsClass.HUNTER to "cacciatore", HsClass.MAGE to "mago", HsClass.PALADIN to "paladino", HsClass.PRIEST to "sacerdote",
+                HsClass.ROGUE to "ladro", HsClass.SHAMAN to "sciamano", HsClass.WARLOCK to "stregone", HsClass.WARRIOR to "guerriero",
+            ),
+        ),
+        UiLanguage(
+            locale = "plPL",
+            confirm = listOf("potwierdz"),
+            mulligan = listOf("reka startowa"),
+            choice = listOf("wybierz"),
+            ownTurn = listOf("koniec tury"),
+            enemyTurn = listOf("tura przeciwnika"),
+            yourTurn = listOf("twoja tura"),
+            victory = listOf("zwyciestwo"),
+            defeat = listOf("porazka"),
+            tie = listOf("remis"),
+            coin = listOf("moneta"),
+            extraCard = emptyList(),
+            classes = mapOf(
+                HsClass.DEATHKNIGHT to "rycerz smierci", HsClass.DEMONHUNTER to "łowca demonow", HsClass.DRUID to "druid",
+                HsClass.HUNTER to "łowca", HsClass.MAGE to "mag", HsClass.PALADIN to "paladyn", HsClass.PRIEST to "kapłan",
+                HsClass.ROGUE to "łotr", HsClass.SHAMAN to "szaman", HsClass.WARLOCK to "czarnoksieznik", HsClass.WARRIOR to "wojownik",
+            ),
+        ),
+        UiLanguage(
+            locale = "ptBR",
+            confirm = listOf("confirmar"),
+            mulligan = listOf("mao inicial"),
+            choice = listOf("escolha uma"),
+            ownTurn = listOf("encerrar turno", "fim do turno"),
+            enemyTurn = listOf("turno do oponente", "turno inimigo"),
+            yourTurn = listOf("sua vez", "seu turno"),
+            victory = listOf("vitoria"),
+            defeat = listOf("derrota"),
+            tie = listOf("empate"),
+            coin = listOf("a moeda"),
+            extraCard = emptyList(),
+            classes = mapOf(
+                HsClass.DEATHKNIGHT to "cavaleiro da morte", HsClass.DEMONHUNTER to "cacador de demonios", HsClass.DRUID to "druida",
+                HsClass.HUNTER to "cacador", HsClass.MAGE to "mago", HsClass.PALADIN to "paladino", HsClass.PRIEST to "sacerdote",
+                HsClass.ROGUE to "ladino", HsClass.SHAMAN to "xama", HsClass.WARLOCK to "bruxo", HsClass.WARRIOR to "guerreiro",
+            ),
+        ),
+    ).map { it.normalized() }
 
-    /** Hinweis beim Mulligan für den zweiten Spieler. */
-    val extraCard = setOf("you get an extra card", "ihr erhaltet eine zusatzliche karte", "du erhaltst eine zusatzliche karte")
+    private fun UiLanguage.normalized() = UiLanguage(
+        locale, confirm, mulligan, choice, ownTurn, enemyTurn, yourTurn, victory, defeat, tie, coin, extraCard,
+        classes.mapValues { normalizeForSearch(it.value) },
+    )
 
-    private val ownTurnCompact = ownTurn.map { it.replace(" ", "") }
-    private val enemyTurnCompact = enemyTurn.map { it.replace(" ", "") }
-    private val enemyFragments = listOf("enemy", "nemyt", "emyturn", "gegner", "advers", "rival", "avversar", "enemig")
-    private val ownFragments = listOf("endturn", "zugbeend", "findutour", "findeturno", "fineturno")
+    private fun set(pick: (UiLanguage) -> List<String>): Set<String> = languages.flatMapTo(HashSet(), pick)
 
-    /** Klassennamen, wie sie auf dem Versus-Bildschirm und den Namensschildern stehen. */
-    private val classNames: Map<String, HsClass> = buildMap {
-        put("demon hunter", HsClass.DEMONHUNTER)
-        put("death knight", HsClass.DEATHKNIGHT)
-        put("druid", HsClass.DRUID)
-        put("hunter", HsClass.HUNTER)
-        put("mage", HsClass.MAGE)
-        put("paladin", HsClass.PALADIN)
-        put("priest", HsClass.PRIEST)
-        put("rogue", HsClass.ROGUE)
-        put("shaman", HsClass.SHAMAN)
-        put("warlock", HsClass.WARLOCK)
-        put("warrior", HsClass.WARRIOR)
-        HsClass.playable.forEach { put(normalizeForSearch(it.displayName), it) }
-    }
+    val confirm = set { it.confirm }
+    val mulligan = set { it.mulligan }
+    val choice = set { it.choice }
+    val coin = set { it.coin }
+    val extraCard = set { it.extraCard }
+    private val victory = set { it.victory }
+    private val defeat = set { it.defeat }
+    private val tie = set { it.tie }
+    private val ownTurn = set { it.ownTurn }.map { it.replace(" ", "") }
+    private val enemyTurn = set { it.enemyTurn }.map { it.replace(" ", "") }
+    private val yourTurn = set { it.yourTurn }.map { it.replace(" ", "") }
+
+    /** Fragments that survive typical misreadings of the turn button (e.g. "EMY TURN"). */
+    private val enemyFragments = listOf("enemy", "nemyt", "emyturn", "gegner", "advers", "rival", "avversar", "enemig", "przeciwn", "oponent")
+    private val ownFragments = listOf("endturn", "zugbeend", "findutour", "findeturno", "fineturno", "koniectury", "encerrarturno")
+
+    private val classNames: Map<String, HsClass> =
+        languages.flatMap { language -> language.classes.map { (cls, name) -> name to cls } }.toMap()
+
+    /** Texts that only exist in one client language. */
+    private val localeOfText: Map<String, String> = languages
+        .flatMap { language -> language.all.map { normalizeForSearch(it) to language.locale } }
+        .groupBy({ it.first }, { it.second })
+        .filterValues { it.distinct().size == 1 }
+        .mapValues { it.value.first() }
+
+    fun localeOf(normalized: String): String? = localeOfText[normalized]
 
     fun matches(normalized: String, keywords: Set<String>): Boolean =
         normalized in keywords || keywords.any { it.length >= 7 && normalized.contains(it) }
 
-    /**
-     * Beschriftung des Zug-Knopfs (nur für Text an dessen Position aufrufen): true = eigener Zug
-     * („Zug beenden“), false = Gegner am Zug, null = nicht lesbar. Tolerant gegenüber Lesefehlern
-     * wie „EMY TURN“ oder „NEMYTURN“.
-     */
+    /** Turn button: true = own turn, false = opponent's turn, null = unreadable. */
     fun turnButton(normalized: String): Boolean? {
         val compact = normalized.replace(" ", "")
         if (compact.length < 6 || compact.length > 20) return null
         if (enemyFragments.any { it in compact }) return false
         if (ownFragments.any { it in compact }) return true
-        val own = ownTurnCompact.maxOf { CardNameIndex.similarity(compact, it) }
-        val enemy = enemyTurnCompact.maxOf { CardNameIndex.similarity(compact, it) }
+        val own = ownTurn.maxOf { CardNameIndex.similarity(compact, it) }
+        val enemy = enemyTurn.maxOf { CardNameIndex.similarity(compact, it) }
         return when {
             enemy >= 0.7 && enemy > own -> false
             own >= 0.7 && own > enemy -> true
@@ -241,12 +358,10 @@ object UiKeywords {
         }
     }
 
-    /** Großer Hinweis „Du bist am Zug“ in der Bildschirmmitte. */
     fun isYourTurnBanner(normalized: String): Boolean {
         val compact = normalized.replace(" ", "")
         if (compact.length < 5 || compact.length > 16) return false
-        return listOf("yourturn", "deinzug", "euerzug", "ihrseidamzug", "duistamzug", "avousdejouer", "tuturno", "toccaate")
-            .any { CardNameIndex.similarity(compact, it) >= 0.7 || (it.length >= 7 && it.endsWith(compact) && compact.length >= 6) }
+        return yourTurn.any { CardNameIndex.similarity(compact, it) >= 0.7 || (it.length >= 7 && it.endsWith(compact) && compact.length >= 6) }
     }
 
     fun result(normalized: String): MatchResult? = when (normalized) {
@@ -256,11 +371,10 @@ object UiKeywords {
         else -> null
     }
 
-    /** Klassenname auf einem Namensschild, z. B. „DEMON HUNTER“ oder „SCHURKE“. */
+    /** Class on a name plate, e.g. "DEMON HUNTER"; tolerates female forms and small misreadings. */
     fun heroClass(normalized: String): HsClass? {
         classNames[normalized]?.let { return it }
         if (normalized.length < 5) return null
-        // weibliche Formen („Jägerin“) und kleine Lesefehler
         classNames.entries.firstOrNull { (name, _) ->
             name.length >= 5 && normalized.startsWith(name) && normalized.length <= name.length + 2
         }?.let { return it.value }

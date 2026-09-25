@@ -23,13 +23,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Bilderkennung. Die Positionen der Texte entsprechen einer echten Aufnahme des Hearthstone-Clients
- * (Englisch, 20:9-Handy): Versus-Bildschirm, Mulligan mit Kartentexten, Zug-Knopf, Handreihe,
- * gezogene Karte rechts, gegnerische Karte links, Auswahl („Choose One“), Ergebnis.
- */
 class VisionTest {
-
     private val db = CardDatabase.parse(
         """
         [
@@ -55,7 +49,6 @@ class VisionTest {
         cards = mapOf(101 to 2, 102 to 2, 103 to 1, 104 to 2, 105 to 2),
     )
 
-    /** Gleiche Karten, aber andere Klasse – darf trotz Gleichstand nicht erkannt werden. */
     private val mageLookalike = rogueDeck.copy(id = "mage", name = "Magier", heroClass = HsClass.MAGE)
 
     private var time = 0L
@@ -64,7 +57,6 @@ class VisionTest {
     private fun line(text: String, x: Float, y: Float, h: Float = 0.03f, w: Float = 0.1f) =
         OcrLine(text, x - w / 2, y - h / 2, x + w / 2, y + h / 2)
 
-    // Bausteine des Bildschirms (Positionen aus der Aufnahme)
     private fun versus() = listOf(
         line("Broxigar", 0.315f, 0.675f, w = 0.07f),
         line("DEMON HUNTER", 0.315f, 0.71f, h = 0.02f),
@@ -97,13 +89,10 @@ class VisionTest {
 
     @Test
     fun contextBoostsRecognitionOfKnownDeckCards() {
-        // Verrauschter Name (3 Fehler auf 12 Zeichen): global zu unsicher, mit Deck-Kontext ein Treffer.
         val noisy = "Mathyas Shqx"
         assertNull(index.match(noisy))
         assertEquals(103, index.match(noisy, preferred = setOf(103))?.dbfIds?.first())
-        // Kontext hebt die passende dbfId (Legacy-Backstab) nach vorne.
         assertEquals(104, index.match("Bakstab", preferred = setOf(104))?.dbfIds?.first())
-        // Ohne echten Bezug bleibt es strikt – kein erzwungener Treffer.
         assertNull(index.match("xyzqwert", preferred = setOf(105)))
     }
 
@@ -112,7 +101,6 @@ class VisionTest {
         val twilight = CardNameIndex(listOf(1 to "Twilight Egg", 2 to "Twilight Mistress", 3 to "Twilight Drake", 4 to "Opu the Unseen"))
         assertEquals(listOf(2), twilight.match("Twilight Mistre")?.dbfIds)
         assertEquals(listOf(4), twilight.match("Opu the Unse")?.dbfIds)
-        // Passt auf mehrere Karten bzw. zu kurz → kein Treffer
         assertNull(twilight.match("Twilight"))
         assertNull(twilight.match("Twilight M"))
     }
@@ -133,7 +121,6 @@ class VisionTest {
         assertEquals(HsClass.DEMONHUNTER, UiKeywords.heroClass("damonenjagerin"))
         assertNull(UiKeywords.heroClass("max"))
         assertEquals(MatchResult.LOSS, UiKeywords.result("defeat"))
-        // Andere Seitenverhältnisse werden auf das vermessene Gerät umgerechnet
         assertEquals(0.5f, ScreenRegions.boardX(0.5f, 16f / 9f))
         assertTrue(ScreenRegions.boardX(0.2f, 16f / 9f) > 0.2f)
         assertEquals(0.2f, ScreenRegions.boardX(0.2f, 0f))
@@ -146,10 +133,8 @@ class VisionTest {
         fun feed(vararg lines: OcrLine) = tracker.onFrame(frame(*lines)).also { events += it }
         fun feed(lines: List<OcrLine>) = feed(*lines.toTypedArray())
 
-        // Hauptmenü: nichts passiert
         assertTrue(feed(line("Play", 0.5f, 0.4f), line("Collection", 0.5f, 0.6f)).isEmpty())
 
-        // Versus-Bildschirm: Klassen beider Spieler, der Heldenname „Broxigar“ ist keine Karte
         feed(versus() + line("TURN", 0.815f, 0.49f, h = 0.02f, w = 0.03f))
         assertEquals(
             listOf(
@@ -161,18 +146,15 @@ class VisionTest {
         )
         assertEquals(VisionGameTracker.Phase.MULLIGAN, tracker.phase)
 
-        // Mulligan mit Kartentexten – Namen im Text („Eviscerate“ unter „Deathrattle: Herald“) zählen nicht
         val row = rowCard("Spymistress", 0.41f, "Deathrattle: Herald", "Eviscerate") +
             rowCard("Backstab", 0.58f, "Deal 2 damage to an", "undamaged minion.") +
             rowCard("Mathias Shaw", 0.75f, "Stealth. Whenever a friendly", "Stealthed minion attacks,")
         repeat(3) { feed(mulliganHeader() + row) }
-        // Bestätigt: Backstab wird getauscht, Preparation fliegt rechts herein
         val kept = rowCard("Spymistress", 0.41f) + rowCard("Mathias Shaw", 0.75f)
         feed(kept)
         feed(kept + line("Preparation", 0.905f, 0.69f, h = 0.02f, w = 0.05f))
         feed(kept)
         events.clear()
-        // Karten gehen auf die Hand → Mulligan fertig
         feed(line("Spym", 0.7f, 0.96f, h = 0.02f, w = 0.02f))
         feed(line("Spym", 0.7f, 0.96f, h = 0.02f, w = 0.02f))
         assertEquals(VisionGameTracker.Phase.PLAYING, tracker.phase)
@@ -182,7 +164,6 @@ class VisionTest {
         )
         assertEquals(listOf(GameEvent.FriendlyCardMulliganed(listOf(9104, 104))), events.filterIsInstance<GameEvent.FriendlyCardMulliganed>())
 
-        // Erster Zug: „Your Turn“ → man beginnt; gezogene Karte rechts vergrößert
         events.clear()
         feed(yourTurn())
         feed(drawn("Eviscerate"), line("Deal 2 damage.", 0.755f, 0.7f, h = 0.025f))
@@ -196,7 +177,6 @@ class VisionTest {
             events,
         )
 
-        // Angetippte bzw. gezogene Handkarten zählen nicht erneut; die Handreihe bestätigt nur
         events.clear()
         feed(line("Mathias Shaw", 0.69f, 0.485f, h = 0.07f, w = 0.16f), endTurn())
         repeat(2) { feed(*zoomRow("Spymistress", "Preparation", "Mathias Shaw", "Eviscerate").toTypedArray(), endTurn()) }
@@ -204,7 +184,6 @@ class VisionTest {
 
         repeat(2) { feed(endTurn()) }
 
-        // Gegnerischer Zug: Karte fliegt herein und wird links gezeigt → einmal; zweites Exemplar erneut
         events.clear()
         feed(enemyTurn())
         feed(enemyTurn())
@@ -217,7 +196,6 @@ class VisionTest {
             events,
         )
 
-        // Eigener Zug: Auswahl („Choose One“) zählt nicht, die gewählte Karte ist keine Deckkarte
         events.clear()
         feed(yourTurn())
         val choice = listOf(line("Choose One", 0.495f, 0.125f)) +
@@ -229,13 +207,11 @@ class VisionTest {
             events,
         )
 
-        // Preparation ausgespielt (fehlt mehrere Sekunden in der vollständigen Handreihe), dann zweites Exemplar gezogen
         events.clear()
         repeat(6) { feed(*zoomRow("Spymistress", "Mathias Shaw", "Eviscerate", "Loot Hoarder").toTypedArray(), endTurn()) }
         feed(drawn("Preparation"), endTurn())
         assertEquals(listOf<GameEvent>(GameEvent.FriendlyCardSeen(listOf(102))), events)
 
-        // Sieg (zwei Bilder zur Bestätigung)
         events.clear()
         feed(resultText("Victory!"), endTurn())
         assertTrue(events.isEmpty())
@@ -243,11 +219,9 @@ class VisionTest {
         assertEquals(listOf<GameEvent>(GameEvent.GameEnded(MatchResult.WIN)), events)
         assertEquals(VisionGameTracker.Phase.ENDED, tracker.phase)
 
-        // Danach noch sichtbare Texte starten keine neue Partie …
         events.clear()
         repeat(8) { feed(endTurn()) }
         assertTrue(events.isEmpty())
-        // … der nächste Versus-Bildschirm schon
         time += 40
         feed(versus())
         assertEquals(GameEvent.GameStarted, events.first())
@@ -256,10 +230,8 @@ class VisionTest {
     @Test
     fun shortFalseGameIsNotRecorded() {
         val tracker = VisionGameTracker(index)
-        // Zug-Knopf dauerhaft sichtbar → Erkennung mitten in der Partie gestartet
         val events = (1..6).flatMap { tracker.onFrame(frame(enemyTurn())) }.toMutableList()
         assertEquals(listOf<GameEvent>(GameEvent.GameStarted), events.take(1))
-        // Sofort „Niederlage“ – keine echte Partie, nichts für die Match-History
         events += tracker.onFrame(frame(resultText("Defeat!")))
         events += tracker.onFrame(frame(resultText("Defeat!")))
         assertTrue(events.none { it is GameEvent.GameEnded })
@@ -287,7 +259,6 @@ class VisionTest {
         val otherDeck = Deck(id = "other", name = "Anderes", heroClass = HsClass.ROGUE, cards = mapOf(105 to 2, 202 to 2))
         assertEquals("rogue", DeckIdentifier.identify(seen, listOf(otherDeck, rogueDeck))?.id)
         assertNull(DeckIdentifier.identify(listOf(listOf(101)), listOf(rogueDeck)))
-        // Zu viele unpassende Karten → kein Treffer
         assertNull(DeckIdentifier.identify(listOf(listOf(101), listOf(201), listOf(202), listOf(202)), listOf(rogueDeck)))
     }
 
@@ -308,7 +279,6 @@ class VisionTest {
             GameEvent.TurnOrderDetected(friendlyWentFirst = true),
             GameEvent.TurnChanged(1),
             GameEvent.TurnChanged(2),
-            // Schurkenkarte links erkannt – passt nicht zum Dämonenjäger → ignoriert
             GameEvent.OpponentCardSeen(listOf(102)),
             GameEvent.OpponentCardSeen(listOf(201)),
             GameEvent.OpponentCardSeen(listOf(202)),
@@ -332,7 +302,7 @@ class VisionTest {
         assertEquals(MatchResult.WIN, record.result)
         assertEquals("Schurke (Shaw)", record.deckName)
         assertEquals(HsClass.DEMONHUNTER, record.opponentClass)
-        assertEquals(MatchSource.LOG, record.source)
+        assertEquals(MatchSource.AUTO, record.source)
         assertEquals(4, record.timeline.count { it.type == TimelineType.DRAW })
         assertEquals(1, record.timeline.count { it.type == TimelineType.RETURN })
     }
@@ -381,9 +351,7 @@ class VisionTest {
         val json = AppJson.encodeToString(ListSerializer(OcrFrame.serializer()), frames)
         assertTrue(json.contains("\"s\":\"Spymistress\""))
         assertEquals(frames, AppJson.decodeFromString(ListSerializer(OcrFrame.serializer()), json))
-        // Ältere Aufzeichnungen ohne Seitenverhältnis bleiben lesbar
         assertEquals(0f, AppJson.decodeFromString(OcrFrame.serializer(), """{"ts":1,"lines":[]}""").aspect)
-        // Eine einzelne Karte ohne Versus-Bildschirm/Mulligan/Zug-Knopf startet keine Partie
         assertTrue(VisionGameTracker.replay(index, frames).isEmpty())
     }
 }

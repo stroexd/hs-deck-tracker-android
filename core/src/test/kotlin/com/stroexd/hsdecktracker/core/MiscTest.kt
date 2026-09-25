@@ -23,6 +23,7 @@ import com.stroexd.hsdecktracker.core.data.DeckRepository
 import com.stroexd.hsdecktracker.core.data.MatchRepository
 import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckAnalysis
+import com.stroexd.hsdecktracker.core.deck.DeckIssue
 import com.stroexd.hsdecktracker.core.deck.IssueSeverity
 import com.stroexd.hsdecktracker.core.meta.HsReplayParser
 import com.stroexd.hsdecktracker.core.meta.OpponentPredictor
@@ -85,10 +86,10 @@ class MiscTest {
             cards = mapOf(FIREBALL to 2, LEEROY to 2, OLD_WILD to 1, RENATHAL to 1),
         )
         val issues = DeckAnalysis.validate(deck, db, FormatRules())
-        assertTrue(issues.any { it.message.contains("6 von 40") })
-        assertTrue(issues.any { it.severity == IssueSeverity.ERROR && it.message.contains("Leeroy") })
-        assertTrue(issues.any { it.message.contains("Feuerball gehört nicht") })
-        assertTrue(issues.any { it.message.contains("Alte Karte ist in Standard nicht erlaubt") })
+        assertTrue(DeckIssue.WrongSize(6, 40) in issues)
+        assertTrue(issues.any { it is DeckIssue.TooManyCopies && it.card.dbfId == LEEROY && it.severity == IssueSeverity.ERROR })
+        assertTrue(issues.any { it is DeckIssue.OtherClass && it.card.dbfId == FIREBALL })
+        assertTrue(issues.any { it is DeckIssue.NotInFormat && it.card.dbfId == OLD_WILD })
 
         val summary = DeckAnalysis.summary(deck.cards, db)
         assertEquals(6, summary.totalCards)
@@ -96,13 +97,13 @@ class MiscTest {
         assertEquals(2 * 40 + 2 * 1600 + 40 + 1600, summary.fullDustCost)
         val export = DeckAnalysis.exportText(deck, db)
         assertTrue(export.startsWith("### Test"))
+        assertTrue(export.contains("# Class: Warrior"))
         assertTrue(export.contains("# 2x (4) Feuerball"))
     }
 
     @Test
     fun drawOdds() {
         assertEquals(2.0 / 30, DrawOdds.nextDraw(30, 2))
-        // Mindestens eine von 2 Karten in 3 Zügen aus 30: 1 - (28·27·26)/(30·29·28)
         val expected = 1 - (28.0 * 27 * 26) / (30.0 * 29 * 28)
         assertTrue(abs(DrawOdds.atLeastOne(30, 2, 3) - expected) < 1e-9)
         assertEquals(1.0, DrawOdds.atLeastOne(5, 1, 5))
@@ -161,7 +162,7 @@ class MiscTest {
         assertEquals(HsClass.MAGE, aggro.heroClass)
         assertTrue(abs(aggro.winRate!! - 0.555) < 1e-9)
         assertEquals(mapOf(FIREBALL to 2, RARE_NEUTRAL to 2), aggro.cards)
-        assertEquals("Schurke-Deck", decks.first { it.id == "ghi" }.displayName)
+        assertEquals("Rogue Deck", decks.first { it.id == "ghi" }.displayName)
         assertTrue(aggro.deckCode.startsWith("AAE"))
 
         val prediction = OpponentPredictor.predict(HsClass.MAGE, listOf(EPIC_MAGE), decks)
@@ -178,7 +179,6 @@ class MiscTest {
         assertEquals(42L, saved.createdAt)
         val imported = repo.importFromText("### Import\n${saved.deckCode()}", db)
         assertEquals("Import", imported.single().name)
-        // Neue Instanz liest die Datei wieder ein
         val reloaded = DeckRepository(dir)
         assertEquals(listOf("Persistiert", "Import"), reloaded.decks.value.map { it.name })
 
@@ -186,7 +186,7 @@ class MiscTest {
         matches.add(MatchRecord(timestamp = 1, result = MatchResult.WIN))
         assertEquals(1, MatchRepository(dir).matches.value.size)
 
-        val backup = BackupData(exportedAt = 5, decks = reloaded.decks.value, matches = matches.matches.value, settings = AppSettings(cardLocale = "enUS"))
+        val backup = BackupData(exportedAt = 5, decks = reloaded.decks.value, matches = matches.matches.value, settings = AppSettings(language = "enUS"))
         val restored = Backup.import(Backup.export(backup))
         assertEquals(backup, restored)
         dir.deleteRecursively()

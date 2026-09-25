@@ -14,10 +14,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/**
- * Persistiert einen Wert als JSON-Datei und stellt ihn als [StateFlow] bereit.
- * Schreibvorgänge sind atomar (temporäre Datei + Umbenennen) und serialisiert.
- */
 class JsonFileStore<T>(
     private val file: File,
     private val serializer: KSerializer<T>,
@@ -34,7 +30,6 @@ class JsonFileStore<T>(
         return try {
             json.decodeFromString(serializer, file.readText())
         } catch (e: Exception) {
-            // Defekte Datei beiseitelegen statt Daten stillschweigend zu überschreiben.
             file.renameTo(File(file.parentFile, "${file.name}.corrupt-${System.currentTimeMillis()}"))
             default
         }

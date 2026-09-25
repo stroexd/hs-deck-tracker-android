@@ -10,11 +10,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-enum class ResultFilter(val displayName: String) {
-    ALL("Alle"),
-    WINS("Siege"),
-    LOSSES("Niederlagen"),
-}
+enum class ResultFilter { ALL, WINS, LOSSES }
 
 data class MatchQuery(
     val text: String = "",
@@ -25,12 +21,10 @@ data class MatchQuery(
     val sinceMillis: Long? = null,
 )
 
-/** Partien eines Kalendertags mit Tagesbilanz. */
 data class MatchDay(val date: LocalDate, val matches: List<MatchRecord>) {
     val winRate: WinRate get() = StatsCalculator.overall(matches)
 }
 
-/** Zusammenfassung eines Zugs aus dem Partieverlauf. */
 data class TurnSummary(
     val turn: Int,
     val drawn: List<Int>,
@@ -40,9 +34,13 @@ data class TurnSummary(
 )
 
 object MatchHistory {
-
-    /** Filtert und sortiert (neueste zuerst). Die Textsuche berücksichtigt Deck, Archetyp, Klassen, Notizen und Gegnerkarten. */
-    fun filter(matches: List<MatchRecord>, query: MatchQuery, db: CardDatabase? = null): List<MatchRecord> {
+    /** [labels] adds localized words (class, result names) to the text search. */
+    fun filter(
+        matches: List<MatchRecord>,
+        query: MatchQuery,
+        db: CardDatabase? = null,
+        labels: (MatchRecord) -> String = { "" },
+    ): List<MatchRecord> {
         val terms = normalizeForSearch(query.text).split(' ').filter { it.isNotBlank() }
         return matches.filter { m ->
             (query.sinceMillis == null || m.timestamp >= query.sinceMillis) &&
@@ -54,33 +52,23 @@ object MatchHistory {
                     ResultFilter.WINS -> m.result == MatchResult.WIN
                     ResultFilter.LOSSES -> m.result == MatchResult.LOSS
                 } &&
-                (terms.isEmpty() || searchText(m, db).let { haystack -> terms.all { it in haystack } })
+                (terms.isEmpty() || searchText(m, db, labels).let { haystack -> terms.all { it in haystack } })
         }.sortedByDescending { it.timestamp }
     }
 
-    private fun searchText(m: MatchRecord, db: CardDatabase?): String = buildString {
+    private fun searchText(m: MatchRecord, db: CardDatabase?, labels: (MatchRecord) -> String): String = buildString {
         append(normalizeForSearch(m.deckName)).append(' ')
         append(normalizeForSearch(m.opponentArchetype.orEmpty())).append(' ')
-        append(normalizeForSearch(m.playerClass.displayName)).append(' ')
-        append(normalizeForSearch(m.opponentClass.displayName)).append(' ')
-        append(normalizeForSearch(m.result.displayName)).append(' ')
+        append(normalizeForSearch(labels(m))).append(' ')
         append(normalizeForSearch(m.notes)).append(' ')
         if (db != null) m.opponentCards.forEach { id -> db.byDbfId(id)?.let { append(normalizeForSearch(it.name)).append(' ') } }
     }
 
-    /** Gruppiert nach Kalendertag (neueste Tage zuerst). */
     fun groupByDay(matches: List<MatchRecord>, zone: ZoneId = ZoneId.systemDefault()): List<MatchDay> =
         matches.groupBy { Instant.ofEpochMilli(it.timestamp).atZone(zone).toLocalDate() }
             .map { (date, list) -> MatchDay(date, list.sortedByDescending { it.timestamp }) }
             .sortedByDescending { it.date }
 
-    fun dayLabel(date: LocalDate, today: LocalDate = LocalDate.now()): String = when (date) {
-        today -> "Heute"
-        today.minusDays(1) -> "Gestern"
-        else -> date.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.GERMANY))
-    }
-
-    /** Verlauf Zug für Zug. */
     fun turns(match: MatchRecord): List<TurnSummary> =
         match.timeline.groupBy { it.turn }.toSortedMap().map { (turn, events) ->
             TurnSummary(
@@ -92,7 +80,6 @@ object MatchHistory {
             )
         }
 
-    /** Eigene Karten, die am Ende gezogen (und nicht zurückgemischt) waren, in Zugreihenfolge. */
     fun drawnCards(match: MatchRecord): List<Int> {
         val result = mutableListOf<Int>()
         for (event in match.timeline) {
@@ -106,50 +93,31 @@ object MatchHistory {
     }
 }
 
+/** CSV for spreadsheets and other tools – deliberately language independent. */
 object MatchExporter {
-    private val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.GERMANY)
+    private val dateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT)
 
     fun toCsv(matches: List<MatchRecord>, db: CardDatabase, zone: ZoneId = ZoneId.systemDefault()): String = buildString {
-        appendLine("Datum;Ergebnis;Deck;Klasse;Gegnerklasse;Gegner-Archetyp;Format;Am Zug;Züge;Dauer (s);Quelle;Gegnerkarten;Notizen")
+        appendLine("date;result;deck;class;opponent_class;opponent_archetype;format;went_first;turns;duration_s;source;opponent_cards;notes")
         for (m in matches.sortedBy { it.timestamp }) {
             val fields = listOf(
                 Instant.ofEpochMilli(m.timestamp).atZone(zone).format(dateFormat),
-                m.result.displayName,
+                m.result.name.lowercase(),
                 m.deckName,
-                m.playerClass.displayName,
-                m.opponentClass.displayName,
+                m.playerClass.name.lowercase(),
+                m.opponentClass.name.lowercase(),
                 m.opponentArchetype.orEmpty(),
-                m.format.displayName,
-                when (m.wentFirst) {
-                    true -> "ja"
-                    false -> "nein (Münze)"
-                    null -> ""
-                },
+                m.format.name.lowercase(),
+                m.wentFirst?.toString().orEmpty(),
                 m.turns?.toString().orEmpty(),
                 m.durationSeconds?.toString().orEmpty(),
-                m.source.displayName,
+                m.source.name.lowercase(),
                 m.opponentCards.joinToString(", ") { db.byDbfId(it)?.name ?: it.toString() },
                 m.notes,
             )
             appendLine(fields.joinToString(";") { escape(it) })
         }
     }
-
-    /** Lesbare Zusammenfassung zum Teilen. */
-    fun summaryText(m: MatchRecord, db: CardDatabase, zone: ZoneId = ZoneId.systemDefault()): String = buildString {
-        appendLine("${m.result.displayName}: ${m.deckName.ifBlank { m.playerClass.displayName }} vs. ${m.opponentArchetype ?: m.opponentClass.displayName}")
-        appendLine(Instant.ofEpochMilli(m.timestamp).atZone(zone).format(dateFormat) + " · " + m.format.displayName)
-        val details = listOfNotNull(
-            m.wentFirst?.let { if (it) "am Zug" else "mit Münze" },
-            m.turns?.let { "$it Züge" },
-            m.durationSeconds?.let { "%d:%02d min".format(it / 60, it % 60) },
-        )
-        if (details.isNotEmpty()) appendLine(details.joinToString(" · "))
-        if (m.opponentCards.isNotEmpty()) {
-            appendLine("Gegner spielte: " + m.opponentCards.joinToString(", ") { db.byDbfId(it)?.name ?: it.toString() })
-        }
-        if (m.notes.isNotBlank()) appendLine("Notiz: ${m.notes}")
-    }.trimEnd()
 
     private fun escape(value: String): String =
         if (value.any { it == ';' || it == '"' || it == '\n' }) "\"" + value.replace("\"", "\"\"") + "\"" else value

@@ -29,7 +29,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.unit.dp
 import com.stroexd.hsdecktracker.core.cards.Card
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
@@ -40,9 +43,10 @@ import com.stroexd.hsdecktracker.core.deck.DeckSummary
 import com.stroexd.hsdecktracker.core.deck.IssueSeverity
 import com.stroexd.hsdecktracker.core.deck.SideboardCard
 import com.stroexd.hsdecktracker.core.util.formatNumber
+import com.stroexd.hsdecktracker.ui.label
+import com.stroexd.hsdecktracker.ui.message
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 
-/** Zusammenfassung „Was fehlt mir für dieses Deck?“ – das Herzstück des Sammlungsabgleichs. */
 @Composable
 fun CraftSummaryCard(
     analysis: CraftAnalysis,
@@ -58,10 +62,10 @@ fun CraftSummaryCard(
     ) {
         Column(Modifier.padding(14.dp)) {
             if (collectionEmpty) {
-                Text("Sammlungsabgleich", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.collection_check), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Lade im Tab „Sammlung“ deine Karten hoch, um zu sehen, welche Karten dir fehlen und wie viel Arkanstaub das Deck kostet.",
+                    stringResource(R.string.collection_check_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -71,16 +75,16 @@ fun CraftSummaryCard(
                 if (analysis.isComplete) {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = HsColors.Win)
                     Spacer(Modifier.width(8.dp))
-                    Text("Du kannst dieses Deck sofort bauen!", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.deck_buildable_now), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 } else {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "Es fehlen ${analysis.missingCount} Karten",
+                            pluralStringResource(R.plurals.cards_missing, analysis.missingCount, analysis.missingCount),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            "Du besitzt ${analysis.ownedCards} von ${analysis.totalCards} Karten",
+                            stringResource(R.string.cards_owned_of, analysis.ownedCards, analysis.totalCards),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -98,10 +102,9 @@ fun CraftSummaryCard(
                 Spacer(Modifier.height(6.dp))
                 val statusText = when {
                     analysis.uncraftableMissing > 0 ->
-                        "⚠ ${analysis.uncraftableMissing} fehlende Karte(n) können nicht hergestellt werden."
-                    analysis.craftableWith(dust) ->
-                        "Mit deinem Staub (${formatNumber(dust)}) sofort herstellbar."
-                    else -> "Dir fehlen noch ${formatNumber(analysis.dustCost - dust)} Staub (du hast ${formatNumber(dust)})."
+                        pluralStringResource(R.plurals.uncraftable_missing, analysis.uncraftableMissing, analysis.uncraftableMissing)
+                    analysis.craftableWith(dust) -> stringResource(R.string.craftable_with_dust, formatNumber(dust))
+                    else -> stringResource(R.string.dust_missing, formatNumber(analysis.dustCost - dust), formatNumber(dust))
                 }
                 Text(statusText, style = MaterialTheme.typography.bodySmall)
                 Row(
@@ -111,7 +114,7 @@ fun CraftSummaryCard(
                         .padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Fehlende Karten", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.missing_cards), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                     Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = null)
                 }
                 if (expanded) {
@@ -119,7 +122,7 @@ fun CraftSummaryCard(
                         analysis.missing.forEach { missing ->
                             CardTile(
                                 card = missing.card,
-                                name = missing.card?.name ?: "Unbekannte Karte (${missing.dbfId})",
+                                name = missing.card?.name ?: "#${missing.dbfId}",
                                 cost = missing.card?.cost ?: 0,
                                 count = missing.missing,
                                 missing = missing.missing,
@@ -130,7 +133,7 @@ fun CraftSummaryCard(
                                             DustLabel(missing.totalCost, Modifier.padding(horizontal = 8.dp))
                                         } else {
                                             Text(
-                                                "n. herstellbar",
+                                                stringResource(R.string.not_craftable_short),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = HsColors.Warning,
                                                 modifier = Modifier.padding(horizontal = 8.dp),
@@ -156,7 +159,7 @@ fun DeckSummaryCard(summary: DeckSummary, expectedSize: Int, modifier: Modifier 
         Column(Modifier.padding(14.dp)) {
             Row {
                 Column(Modifier.weight(1f)) {
-                    Text("Karten", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.cards), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         "${summary.totalCards}/$expectedSize",
                         style = MaterialTheme.typography.titleMedium,
@@ -165,11 +168,11 @@ fun DeckSummaryCard(summary: DeckSummary, expectedSize: Int, modifier: Modifier 
                     )
                 }
                 Column(Modifier.weight(1f)) {
-                    Text("Ø Mana", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.avg_mana), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("%.2f".format(summary.averageCost), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 Column(Modifier.weight(1f)) {
-                    Text("Staubwert", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.dust_value), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     DustLabel(summary.fullDustCost)
                 }
             }
@@ -179,7 +182,8 @@ fun DeckSummaryCard(summary: DeckSummary, expectedSize: Int, modifier: Modifier 
                 Spacer(Modifier.height(8.dp))
                 Text(
                     summary.typeCounts.entries.sortedByDescending { it.value }
-                        .joinToString(" · ") { "${it.value} ${it.key.displayName}" },
+                        .map { "${it.value} ${it.key.label()}" }
+                        .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -204,18 +208,14 @@ fun IssuesCard(issues: List<DeckIssue>, modifier: Modifier = Modifier) {
                         tint = if (issue.severity == IssueSeverity.ERROR) HsColors.Loss else HsColors.Warning,
                         modifier = Modifier.padding(end = 8.dp),
                     )
-                    Text(issue.message, style = MaterialTheme.typography.bodySmall)
+                    Text(issue.message(), style = MaterialTheme.typography.bodySmall)
                 }
             }
-            if (issues.size > 8) Text("… und ${issues.size - 8} weitere Hinweise", style = MaterialTheme.typography.bodySmall)
+            if (issues.size > 8) Text(stringResource(R.string.more_issues, issues.size - 8), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
-/**
- * Fügt die Kartenliste eines Decks (inkl. Sideboards) in eine LazyColumn ein.
- * Fehlende Karten werden markiert.
- */
 fun LazyListScope.deckCardItems(
     cards: Map<Int, Int>,
     sideboards: List<SideboardCard>,
@@ -241,7 +241,7 @@ fun LazyListScope.deckCardItems(
     owners.forEach { (owner, list) ->
         item(key = "sb-header-$owner") {
             Text(
-                "Sideboard: ${db.byDbfId(owner)?.name ?: owner}",
+                stringResource(R.string.sideboard_of, db.byDbfId(owner)?.name ?: owner.toString()),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
@@ -252,7 +252,7 @@ fun LazyListScope.deckCardItems(
             val card = db.byDbfId(sb.dbfId)
             CardTile(
                 card = card,
-                name = card?.name ?: "Karte ${sb.dbfId}",
+                name = card?.name ?: "#${sb.dbfId}",
                 cost = card?.cost ?: 0,
                 count = sb.count,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),

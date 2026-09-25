@@ -8,9 +8,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Bildschirmbereiche im Querformat (normiert, links oben = 0/0), vermessen an Aufnahmen des
- * Hearthstone-Clients auf einem 20:9-Handy. x-Werte werden vorher mit [boardX] auf dieses
- * Seitenverhältnis umgerechnet: Das Spielfeld hat eine feste Höhe und ist horizontal zentriert.
+ * Normalized landscape coordinates measured on a 20:9 phone. x is first converted to that aspect
+ * ratio ([boardX]): Hearthstone keeps the board height fixed and centers it horizontally.
  */
 object ScreenRegions {
     const val REFERENCE_ASPECT = 2.22f
@@ -20,60 +19,44 @@ object ScreenRegions {
     fun toBoard(line: OcrLine, aspect: Float): OcrLine =
         if (aspect <= 0f) line else line.copy(left = boardX(line.left, aspect), right = boardX(line.right, aspect))
 
-    /** Eigene Hand am unteren Rand (Fächer bzw. vergrößerte Handreihe beim Antippen). */
     fun isHand(l: OcrLine): Boolean = l.centerY >= 0.84f
 
-    /** Namen der vergrößerten Handreihe (alle Handkarten nebeneinander lesbar). */
+    /** The enlarged hand row shown while the player touches the hand. */
     fun isHandZoomRow(l: OcrLine): Boolean = l.centerY in 0.84f..0.95f && l.centerX in 0.15f..0.85f
 
-    /** Gezogene Karte: wird rechts neben der Mitte vergrößert eingeblendet, bevor sie auf die Hand geht. */
     fun isDrawPopup(l: OcrLine): Boolean = l.centerX >= 0.62f && l.centerY in 0.55f..0.75f
 
-    /** Vergrößerte Karte, die der Gegner gerade spielt (links). */
     fun isOpponentPopup(l: OcrLine): Boolean = l.centerX in 0.1f..0.48f && l.centerY in 0.15f..0.82f
 
-    /** Karten der Starthand (Mulligan), auch beim Austeilen und Austauschen. */
     fun isMulliganCard(l: OcrLine): Boolean = l.centerX in 0.1f..0.97f && l.centerY in 0.25f..0.84f
 
-    /** Zug-Knopf am rechten Rand des Spielfelds. */
     fun isTurnButton(l: OcrLine): Boolean = l.centerX in 0.72f..0.9f && l.centerY in 0.42f..0.58f && l.height <= 0.05f
 
-    /** Großer Hinweis in der Bildschirmmitte („Du bist am Zug“). */
     fun isBanner(l: OcrLine): Boolean = l.centerX in 0.35f..0.65f && l.centerY in 0.38f..0.62f
 
-    /** Namensschild mit Klasse (Versus-Bildschirm, Ecken unten). Links = Gegner. */
     fun isPlayerLabel(l: OcrLine): Boolean = l.centerY >= 0.6f
 
-    /** Überschrift oben in der Mitte (Starthand, Auswahl). */
     fun isHeader(l: OcrLine): Boolean = l.centerY < 0.25f && l.centerX in 0.3f..0.7f
 
-    /** Karte des Gegners auf dem Weg vom Ausspielen zur Anzeige links. */
+    /** An opponent's card flies in from the center before it settles on the left. */
     fun isOpponentCardEntering(l: OcrLine): Boolean = l.centerX >= 0.33f
 
-    /** Kopfzeile (Name des Gegners, Uhrzeit) – dort stehen keine Karten. */
     fun isTopBar(l: OcrLine): Boolean = l.centerY < 0.08f
 
-    /** Großer Sieg-/Niederlage-Schriftzug. */
     fun isResult(l: OcrLine): Boolean = l.centerX in 0.3f..0.7f && l.centerY in 0.3f..0.8f && l.height >= 0.03f
 }
 
 /**
- * Erkennt den Spielverlauf aus OCR-Ergebnissen des Bildschirms (ohne Zugriff auf Spieldateien):
+ * Turns OCR frames of the Hearthstone screen into [GameEvent]s: game start (versus screen or
+ * mulligan), classes (name plates, left = opponent), starting hand, drawn cards (enlarged on the
+ * right or visible in the hand row), opponent plays (enlarged on the left during their turn),
+ * turns (turn button) and the result.
  *
- * - **Spielstart**: Versus-Bildschirm (Klassen beider Spieler) oder Mulligan („Bestätigen“ + Karten)
- * - **Klassen**: Namensschilder links (Gegner) und rechts (eigene Klasse)
- * - **Starthand**: alle Karten des Mulligans, ausgetauschte Karten gehen zurück ins Deck
- * - **Eigene Karten**: vergrößert eingeblendete gezogene Karte bzw. die angetippte Handreihe
- * - **Gegnerkarten**: im gegnerischen Zug links vergrößert eingeblendete Karte
- * - **Züge**: Beschriftung des Zug-Knopfs, **Münze** → mit Münze
- * - **Ergebnis**: „Sieg“ / „Niederlage“ – nur für echte Partien (nicht für kurze Fehlerkennungen)
- *
- * Als Kartenname zählt nur eine ganze Textzeile, die nicht Teil eines Kartentexts ist – Namen, die im
- * Effekttext anderer Karten vorkommen („Herold: Sinestra“), werden so nicht als Karte gewertet.
+ * Only whole lines that stand alone count as card names, so names inside card texts
+ * ("Herald Sinestra") or speech bubbles are ignored.
  */
 class VisionGameTracker(
     private val index: CardNameIndex,
-    /** dbfIds, die im Kontext plausibel sind (erkanntes Deck + Meta-Karten). Verbessert die Trefferquote. */
     private val contextProvider: () -> Set<Int> = { emptySet() },
     private val opponentRepeatMillis: Long = 2_500,
     private val popupRepeatMillis: Long = 4_000,
@@ -85,11 +68,9 @@ class VisionGameTracker(
     var phase: Phase = Phase.IDLE
         private set
 
-    /** Zuletzt erkannte Kartennamen (für Diagnose/Anzeige). */
     var lastRecognized: List<String> = emptyList()
         private set
 
-    /** Begründungen der Entscheidungen (für den Diagnose-Modus), z. B. „gezogen: … (Hand)“. */
     var decisionLog: ((String) -> Unit)? = null
 
     private fun log(message: () -> String) {
@@ -97,9 +78,8 @@ class VisionGameTracker(
     }
 
     private fun describe(card: CardLine): String =
-        "${card.name} „${card.line.text}“ @%.2f/%.2f".format(java.util.Locale.ROOT, card.line.centerX, card.line.centerY)
+        "${card.name} \"${card.line.text}\" @%.2f/%.2f".format(java.util.Locale.ROOT, card.line.centerX, card.line.centerY)
 
-    /** Erkannter Kartenname; [key] ist für alle Drucke und Sprachen einer Karte gleich. */
     private class CardLine(val key: String, val name: String, val line: OcrLine)
 
     private class FrameInfo(
@@ -119,44 +99,50 @@ class VisionGameTracker(
     }
 
     private val ids = HashMap<String, List<Int>>()
-    private var gameStartedAt = 0L
     private var lastActivity = 0L
     private var endedAt = 0L
     private val buttonHistory = ArrayDeque<Boolean>()
+    private val localeVotes = ArrayDeque<String>()
 
-    private var friendlyClass: HsClass? = null
-    private var opponentClass: HsClass? = null
+    /** Client language read from UI texts (e.g. the turn button), null until it is clear. */
+    var gameLocale: String? = null
+        private set
 
-    // Mulligan
-    private val initialHand = HashMap<String, Int>()
-    private val keptHand = HashMap<String, Int>()
-    private var mulliganSignalSeen = false
-    private var mulliganConfirmed = false
-    private var framesWithoutSignal = 0
-    private var framesWithoutRow = 0
-    private var keptFrames = 0
-    private var lastMulliganSignal = 0L
+    private class Game(val startedAt: Long) {
+        var friendlyClass: HsClass? = null
+        var opponentClass: HsClass? = null
 
-    // Züge
-    private var turnState: Boolean? = null
-    private var pendingTurn: Boolean? = null
-    private var ownTurnHoldUntil = 0L
-    private var turnCounter = 0
-    private var turnOrderKnown = false
-    private var coinSeen = false
+        val initialHand = HashMap<String, Int>()
+        val keptHand = HashMap<String, Int>()
+        var mulliganSignalSeen = false
+        var mulliganConfirmed = false
+        var framesWithoutSignal = 0
+        var framesWithoutRow = 0
+        var keptFrames = 0
+        var lastMulliganSignal = startedAt
 
-    // Eigene Karten: gezählte Exemplare, davon ausgespielt
-    private val drawn = HashMap<String, Int>()
-    private val played = HashMap<String, Int>()
-    private val handMisses = HashMap<String, Pair<Int, Long>>()
-    private val popupLastSeen = HashMap<String, Long>()
-    private val lastChoice = HashMap<String, Long>()
+        var turnState: Boolean? = null
+        var pendingTurn: Boolean? = null
+        var ownTurnHoldUntil = 0L
+        var turnCounter = 0
+        var turnOrderKnown = false
+        var coinSeen = false
 
-    private val opponentLastSeen = HashMap<String, Long>()
-    private val opponentSettled = HashMap<String, Boolean>()
+        /** Copies received per card, and how many of them left the hand. */
+        val drawn = HashMap<String, Int>()
+        val played = HashMap<String, Int>()
+        val handMisses = HashMap<String, Pair<Int, Long>>()
+        val popupLastSeen = HashMap<String, Long>()
+        val lastChoice = HashMap<String, Long>()
 
-    private var resultStreak = 0
-    private var lastResult: MatchResult? = null
+        val opponentLastSeen = HashMap<String, Long>()
+        val opponentSettled = HashMap<String, Boolean>()
+
+        var resultStreak = 0
+        var lastResult: MatchResult? = null
+    }
+
+    private var game = Game(0)
 
     fun onFrame(frame: OcrFrame): List<GameEvent> {
         val f = classify(frame)
@@ -165,14 +151,13 @@ class VisionGameTracker(
         buttonHistory.addLast(f.turn != null)
         if (buttonHistory.size > BUTTON_WINDOW) buttonHistory.removeFirst()
 
-        // Spielende
         if (phase == Phase.PLAYING || phase == Phase.MULLIGAN) {
             if (f.result != null) {
-                resultStreak = if (f.result == lastResult) resultStreak + 1 else 1
-                lastResult = f.result
-                if (resultStreak >= 2) {
-                    // Kurze „Partien“ sind Fehlerkennungen – nicht in die Match-History schreiben
-                    if (phase == Phase.PLAYING && (turnCounter >= 2 || now - gameStartedAt >= minGameMillis)) {
+                game.resultStreak = if (f.result == game.lastResult) game.resultStreak + 1 else 1
+                game.lastResult = f.result
+                if (game.resultStreak >= 2) {
+                    // Very short "games" are misrecognitions and don't belong in the match history
+                    if (phase == Phase.PLAYING && (game.turnCounter >= 2 || now - game.startedAt >= minGameMillis)) {
                         events += GameEvent.GameEnded(f.result)
                     }
                     phase = Phase.ENDED
@@ -180,8 +165,8 @@ class VisionGameTracker(
                     return events
                 }
             } else {
-                resultStreak = 0
-                lastResult = null
+                game.resultStreak = 0
+                game.lastResult = null
             }
         }
 
@@ -197,10 +182,9 @@ class VisionGameTracker(
                     }
                     (phase == Phase.IDLE || sinceEnd > MID_GAME_AFTER_END_MILLIS) &&
                         buttonHistory.count { it } >= MID_GAME_FRAMES -> {
-                        // Erkennung während einer laufenden Partie gestartet
                         startGame(events, now)
                         phase = Phase.PLAYING
-                        turnOrderKnown = true
+                        game.turnOrderKnown = true
                         onPlayingFrame(f, now, events)
                     }
                 }
@@ -210,8 +194,6 @@ class VisionGameTracker(
         }
         return events
     }
-
-    // ------------------------------------------------------------------ Auswertung eines Bildes
 
     private fun classify(frame: OcrFrame): FrameInfo {
         val lines = frame.lines.map { ScreenRegions.toBoard(it, frame.aspect) }
@@ -229,11 +211,11 @@ class VisionGameTracker(
         for (line in lines) {
             val normalized = CardNameIndex.normalize(line.text)
             if (normalized.none { it.isLetter() }) continue
+            UiKeywords.localeOf(normalized)?.let(::voteLocale)
             if (UiKeywords.matches(normalized, UiKeywords.confirm) || UiKeywords.matches(normalized, UiKeywords.mulligan)) {
                 mulliganSignal = true
                 continue
             }
-            // Überschrift einer Auswahl („Choose One“) – nicht der Kartentext „Entdeckt …“
             if (ScreenRegions.isHeader(line) && normalized in UiKeywords.choice) {
                 choiceHeader = true
                 continue
@@ -257,7 +239,7 @@ class VisionGameTracker(
                 }
             }
             if (normalized in UiKeywords.coin || UiKeywords.matches(normalized, UiKeywords.extraCard)) {
-                // Die Münze des Gegners erscheint links – nur die eigene zählt
+                // The opponent's coin is shown on the left
                 if (line.centerX >= 0.5f || ScreenRegions.isHand(line)) coin = true
                 continue
             }
@@ -269,14 +251,14 @@ class VisionGameTracker(
                     continue
                 }
             }
-            // Sätze (Kartentext, Sprechblasen) enden mit Punkt – Kartennamen nie
+            // Sentences (card texts, speech bubbles) end with a period, card names never do
             if (ScreenRegions.isTopBar(line) || line.text.trimEnd().endsWith('.')) continue
             nameCandidates += line
         }
         val preferred by lazy(LazyThreadSafetyMode.NONE) { contextProvider() }
         for (line in nameCandidates) {
             if (isTextContinuation(line, lines)) continue
-            // Heldenname über der Klasse auf dem Versus-Bildschirm („Broxigar“ ist auch eine Karte)
+            // Hero name above the class on the versus screen ("Broxigar" is also a card)
             if (labels.any { isDirectlyAbove(line, it) }) continue
             val match = index.match(line.text, preferred) ?: continue
             val key = match.dbfIds.minOrNull()?.toString() ?: continue
@@ -302,10 +284,7 @@ class VisionGameTracker(
         below.top - line.bottom in -0.01f..(1.5f * max(line.height, below.height)) &&
             min(line.right, below.right) > max(line.left, below.left)
 
-    /**
-     * Zeile gehört zu einem Kartentext: Direkt darüber steht (in derselben Spalte) weiterer Text.
-     * Kartennamen stehen dagegen frei auf dem Namensbanner.
-     */
+    /** Card names stand alone on their banner; a line right below other text belongs to a card text. */
     private fun isTextContinuation(line: OcrLine, lines: List<OcrLine>): Boolean {
         val h = max(line.height, 0.01f)
         return lines.any { other ->
@@ -317,7 +296,7 @@ class VisionGameTracker(
         }
     }
 
-    /** Mehrere vergrößerte Karten nebeneinander: Auswahl („Entdecken“, „Wählt aus“) oder Mulligan. */
+    /** Several enlarged cards side by side: a choice (Discover) or the mulligan. */
     private fun isCardRow(cards: List<CardLine>): Boolean {
         for (i in cards.indices) {
             for (j in i + 1 until cards.size) {
@@ -329,81 +308,64 @@ class VisionGameTracker(
         return false
     }
 
+    private fun voteLocale(locale: String) {
+        localeVotes.addLast(locale)
+        if (localeVotes.size > LOCALE_WINDOW) localeVotes.removeFirst()
+        val counts = localeVotes.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }
+        val best = counts.first()
+        val second = counts.getOrNull(1)?.value ?: 0
+        if (best.value >= 3 && best.value >= 2 * second) gameLocale = best.key
+    }
+
     private fun mulliganCards(f: FrameInfo): List<CardLine> =
         f.cards.filter { !ScreenRegions.isHand(it.line) && ScreenRegions.isMulliganCard(it.line) }
 
-    // ------------------------------------------------------------------ Spielstart & Mulligan
-
     private fun startGame(events: MutableList<GameEvent>, now: Long) {
         events += GameEvent.GameStarted
-        gameStartedAt = now
+        game = Game(now)
         lastActivity = now
-        friendlyClass = null
-        opponentClass = null
-        initialHand.clear()
-        keptHand.clear()
-        mulliganSignalSeen = false
-        mulliganConfirmed = false
-        framesWithoutSignal = 0
-        framesWithoutRow = 0
-        keptFrames = 0
-        lastMulliganSignal = now
-        turnState = null
-        pendingTurn = null
-        turnCounter = 0
-        turnOrderKnown = false
-        coinSeen = false
-        drawn.clear()
-        played.clear()
-        handMisses.clear()
-        popupLastSeen.clear()
-        lastChoice.clear()
-        opponentLastSeen.clear()
-        opponentSettled.clear()
-        resultStreak = 0
-        lastResult = null
     }
 
     private fun updateClasses(f: FrameInfo, events: MutableList<GameEvent>) {
-        f.opponentClass?.takeIf { it != opponentClass }?.let {
-            opponentClass = it
+        f.opponentClass?.takeIf { it != game.opponentClass }?.let {
+            game.opponentClass = it
             events += GameEvent.ClassDetected(friendly = false, hsClass = it)
         }
-        f.friendlyClass?.takeIf { it != friendlyClass }?.let {
-            friendlyClass = it
+        f.friendlyClass?.takeIf { it != game.friendlyClass }?.let {
+            game.friendlyClass = it
             events += GameEvent.ClassDetected(friendly = true, hsClass = it)
         }
     }
 
     private fun onMulliganFrame(f: FrameInfo, now: Long, events: MutableList<GameEvent>) {
         updateClasses(f, events)
-        if (f.coin) coinSeen = true
-        f.turn?.let { turnState = it }
+        if (f.coin) game.coinSeen = true
+        f.turn?.let { game.turnState = it }
         val counts = mulliganCards(f).groupingBy { it.key }.eachCount()
 
         if (f.mulliganSignal) {
-            mulliganSignalSeen = true
-            lastMulliganSignal = now
-            framesWithoutSignal = 0
+            game.mulliganSignalSeen = true
+            game.lastMulliganSignal = now
+            game.framesWithoutSignal = 0
         } else {
-            framesWithoutSignal++
+            game.framesWithoutSignal++
         }
-        // „Bestätigen“ verschwunden → ab jetzt liegen nur noch behaltene und neue Karten in der Reihe
-        if (mulliganSignalSeen && framesWithoutSignal >= 2) mulliganConfirmed = true
+        // Once "Confirm" is gone, the row only holds kept and replacement cards
+        if (game.mulliganSignalSeen && game.framesWithoutSignal >= 2) game.mulliganConfirmed = true
 
-        if (!mulliganConfirmed) {
-            counts.forEach { (key, count) -> initialHand.merge(key, count, ::maxOf) }
+        if (!game.mulliganConfirmed) {
+            counts.forEach { (key, count) -> game.initialHand.merge(key, count, ::maxOf) }
         } else if (counts.isNotEmpty()) {
-            counts.forEach { (key, count) -> keptHand.merge(key, count, ::maxOf) }
-            keptFrames++
+            counts.forEach { (key, count) -> game.keptHand.merge(key, count, ::maxOf) }
+            game.keptFrames++
         }
-        framesWithoutRow = if (counts.isEmpty()) framesWithoutRow + 1 else 0
+        game.framesWithoutRow = if (counts.isEmpty()) game.framesWithoutRow + 1 else 0
         if (counts.isNotEmpty() || f.mulliganSignal) lastActivity = now
 
         val done = f.yourTurnBanner ||
-            (mulliganConfirmed && framesWithoutRow >= 2) ||
-            (mulliganConfirmed && now - lastMulliganSignal > MULLIGAN_TIMEOUT_MILLIS) ||
-            (!mulliganSignalSeen && now - gameStartedAt > MULLIGAN_TIMEOUT_MILLIS)
+            (game.mulliganConfirmed && game.framesWithoutRow >= 2) ||
+            (game.mulliganConfirmed && now - game.lastMulliganSignal > MULLIGAN_TIMEOUT_MILLIS) ||
+            (!game.mulliganSignalSeen && now - game.startedAt > MULLIGAN_TIMEOUT_MILLIS)
         if (done) {
             finishMulligan(events)
             phase = Phase.PLAYING
@@ -412,46 +374,43 @@ class VisionGameTracker(
     }
 
     private fun finishMulligan(events: MutableList<GameEvent>) {
-        log { "Mulligan: Starthand $initialHand, behalten $keptHand ($keptFrames Bilder)" }
-        // Behaltene Karten nur verwerten, wenn die Reihe nach dem Bestätigen gut lesbar war
-        val keptReliable = keptFrames >= 2 && keptHand.isNotEmpty()
-        val final = if (keptReliable) keptHand else HashMap(initialHand).apply { keptHand.forEach { (k, c) -> merge(k, c, ::maxOf) } }
-        // Alle Karten der Starthand melden – auch ausgetauschte helfen bei der Deck-Erkennung
-        for ((key, count) in initialHand) {
+        log { "Mulligan: dealt ${game.initialHand}, kept ${game.keptHand} (${game.keptFrames} frames)" }
+        // Replaced cards still count for deck recognition, then go back into the deck
+        val keptReliable = game.keptFrames >= 2 && game.keptHand.isNotEmpty()
+        val final = if (keptReliable) game.keptHand else HashMap(game.initialHand).apply { game.keptHand.forEach { (k, c) -> merge(k, c, ::maxOf) } }
+        for ((key, count) in game.initialHand) {
             val candidates = ids[key] ?: continue
             repeat(count) { events += GameEvent.FriendlyCardSeen(candidates) }
-            drawn[key] = count
+            game.drawn[key] = count
         }
-        for ((key, count) in initialHand) {
+        for ((key, count) in game.initialHand) {
             val back = count - (final[key] ?: 0)
             if (back <= 0) continue
             val candidates = ids[key] ?: continue
             repeat(back) { events += GameEvent.FriendlyCardMulliganed(candidates) }
-            drawn[key] = count - back
+            game.drawn[key] = count - back
         }
         for ((key, count) in final) {
-            val extra = count - (initialHand[key] ?: 0)
+            val extra = count - (game.initialHand[key] ?: 0)
             if (extra <= 0) continue
             val candidates = ids[key] ?: continue
             repeat(extra) { events += GameEvent.FriendlyCardSeen(candidates) }
-            drawn[key] = count
+            game.drawn[key] = count
         }
-        if (coinSeen && !turnOrderKnown) {
-            turnOrderKnown = true
+        if (game.coinSeen && !game.turnOrderKnown) {
+            game.turnOrderKnown = true
             events += GameEvent.TurnOrderDetected(friendlyWentFirst = false)
         }
     }
 
-    // ------------------------------------------------------------------ Laufende Partie
-
     private fun onPlayingFrame(f: FrameInfo, now: Long, events: MutableList<GameEvent>) {
-        if (turnCounter <= 2) updateClasses(f, events)
-        if (f.coin && !turnOrderKnown) {
-            turnOrderKnown = true
+        if (game.turnCounter <= 2) updateClasses(f, events)
+        if (f.coin && !game.turnOrderKnown) {
+            game.turnOrderKnown = true
             events += GameEvent.TurnOrderDetected(friendlyWentFirst = false)
         }
         f.turn?.let { handleTurn(it, f.yourTurnBanner, now, events) }
-        if (f.choice) f.cards.forEach { if (!ScreenRegions.isHand(it.line)) lastChoice[it.key] = now }
+        if (f.choice) f.cards.forEach { if (!ScreenRegions.isHand(it.line)) game.lastChoice[it.key] = now }
         handleOwnCards(f, now, events)
         handleOpponent(f, now, events)
         if (f.turn != null || f.cards.isNotEmpty()) lastActivity = now
@@ -459,47 +418,46 @@ class VisionGameTracker(
     }
 
     /**
-     * Zugwechsel erst nach zwei gleichen Ablesungen (einzelne Lesefehler am Knopf ignorieren).
-     * Nach dem Hinweis „Du bist am Zug“ zeigt der Knopf noch kurz den gegnerischen Zug – das wird ignoriert.
+     * A turn change needs two equal readings. After the "Your Turn" banner the button still shows
+     * the opponent's turn for a moment, which is ignored.
      */
     private fun handleTurn(own: Boolean, banner: Boolean, now: Long, events: MutableList<GameEvent>) {
-        if (banner) ownTurnHoldUntil = now + BANNER_HOLD_MILLIS
-        if (!own && now < ownTurnHoldUntil && turnState == true) return
-        if (own == turnState && turnCounter > 0) {
-            pendingTurn = null
+        if (banner) game.ownTurnHoldUntil = now + BANNER_HOLD_MILLIS
+        if (!own && now < game.ownTurnHoldUntil && game.turnState == true) return
+        if (own == game.turnState && game.turnCounter > 0) {
+            game.pendingTurn = null
             return
         }
-        if (!banner && pendingTurn != own) {
-            pendingTurn = own
+        if (!banner && game.pendingTurn != own) {
+            game.pendingTurn = own
             return
         }
-        pendingTurn = null
-        if (turnCounter == 0) {
-            turnCounter = 1
-            if (!turnOrderKnown) {
-                turnOrderKnown = true
+        game.pendingTurn = null
+        if (game.turnCounter == 0) {
+            game.turnCounter = 1
+            if (!game.turnOrderKnown) {
+                game.turnOrderKnown = true
                 events += GameEvent.TurnOrderDetected(friendlyWentFirst = own)
             }
         } else {
-            turnCounter++
+            game.turnCounter++
         }
-        turnState = own
-        events += GameEvent.TurnChanged(turnCounter)
+        game.turnState = own
+        events += GameEvent.TurnChanged(game.turnCounter)
     }
 
-    private fun inHand(key: String): Int = (drawn[key] ?: 0) - (played[key] ?: 0)
+    private fun inHand(key: String): Int = (game.drawn[key] ?: 0) - (game.played[key] ?: 0)
 
     private fun emitDraw(key: String, count: Int, fromDeck: Boolean, events: MutableList<GameEvent>) {
         val candidates = ids[key] ?: return
         repeat(count) { events += GameEvent.FriendlyCardSeen(candidates, fromDeck) }
-        drawn[key] = (drawn[key] ?: 0) + count
+        game.drawn[key] = (game.drawn[key] ?: 0) + count
     }
 
     /**
-     * Eigene Karten. Gezählt wird, wie viele Exemplare einer Karte man bekommen hat:
-     * - Handreihe: Sind mehr Exemplare gleichzeitig zu sehen als bisher gezählt, wird nachgezählt.
-     * - Fehlt eine Karte über mehrere Sekunden in der vollständig lesbaren Handreihe, wurde sie ausgespielt.
-     * - Gezogene Karte (rechts vergrößert) zählt, wenn die Karte gerade nicht auf der Hand ist.
+     * Counts copies received per card: more copies visible in the hand than counted means a draw was
+     * missed; an enlarged card on the right is a draw unless the card is already in hand (then it's
+     * just being inspected).
      */
     private fun handleOwnCards(f: FrameInfo, now: Long, events: MutableList<GameEvent>) {
         val hand = f.cards.filter { ScreenRegions.isHand(it.line) }
@@ -507,62 +465,57 @@ class VisionGameTracker(
         for ((key, count) in handCounts) {
             val known = inHand(key)
             if (count > known) {
-                log { "Hand: ×$count (bisher $known) ${hand.filter { it.key == key }.joinToString { describe(it) }}" }
+                log { "Hand: ×$count (known $known) ${hand.filter { it.key == key }.joinToString { describe(it) }}" }
                 emitDraw(key, count - known, fromDeck = true, events)
             }
-            handMisses.remove(key)
+            game.handMisses.remove(key)
         }
         detectPlayedCards(hand, handCounts, now)
-        if (turnState == false || f.choice) return
+        if (game.turnState == false || f.choice) return
         for (card in f.cards) {
             if (!ScreenRegions.isDrawPopup(card.line)) continue
-            val last = popupLastSeen.put(card.key, now)
+            val last = game.popupLastSeen.put(card.key, now)
             if (last != null && now - last < popupRepeatMillis) continue
             if (inHand(card.key) > 0) continue
-            val chosen = lastChoice[card.key]?.let { now - it < CHOICE_MEMORY_MILLIS } == true
-            log { "Gezogen${if (chosen) " (gewählt)" else ""}: ${describe(card)}" }
+            val chosen = game.lastChoice[card.key]?.let { now - it < CHOICE_MEMORY_MILLIS } == true
+            log { "Drawn${if (chosen) " (picked)" else ""}: ${describe(card)}" }
             emitDraw(card.key, 1, fromDeck = !chosen, events)
         }
     }
 
-    /**
-     * Ausgespielt: Karte fehlt in der Handreihe, obwohl die Reihe (fast) vollständig lesbar ist –
-     * wiederholt und über mindestens [PLAYED_MIN_MILLIS]. Vorsichtig, damit Lesefehler nicht dazu
-     * führen, dass eine Karte später doppelt gezählt wird.
-     */
+    /** Conservative on purpose: wrongly "played" cards would be counted twice later. */
     private fun detectPlayedCards(hand: List<CardLine>, handCounts: Map<String, Int>, now: Long) {
         val rowSize = hand.count { ScreenRegions.isHandZoomRow(it.line) }
-        val expected = drawn.keys.sumOf { inHand(it) }
+        val expected = game.drawn.keys.sumOf { inHand(it) }
         if (rowSize < 3 || rowSize < expected - 1) return
-        for (key in drawn.keys.toList()) {
+        for (key in game.drawn.keys.toList()) {
             val known = inHand(key)
             val count = handCounts[key] ?: 0
             if (known <= count) continue
-            val (misses, since) = handMisses[key] ?: (0 to now)
+            val (misses, since) = game.handMisses[key] ?: (0 to now)
             if (misses + 1 >= HAND_MISSES_FOR_PLAYED && now - since >= PLAYED_MIN_MILLIS) {
-                log { "Ausgespielt: ${key} (fehlt in der Handreihe)" }
-                played[key] = (played[key] ?: 0) + known - count
-                handMisses.remove(key)
+                log { "Played: $key (missing from hand row)" }
+                game.played[key] = (game.played[key] ?: 0) + known - count
+                game.handMisses.remove(key)
             } else {
-                handMisses[key] = misses + 1 to since
+                game.handMisses[key] = misses + 1 to since
             }
         }
     }
 
     private fun handleOpponent(f: FrameInfo, now: Long, events: MutableList<GameEvent>) {
-        if (turnState != false || f.choice) return
-        // Sieht sich der Spieler gerade die eigene Hand an, können links auch verwandte Karten
-        // (Tooltips) erscheinen – dann zählt nur eine gerade hereinfliegende Karte.
+        if (game.turnState != false || f.choice) return
+        // While the player inspects the hand, related cards may pop up on the left: only trust cards flying in
         val inspectingHand = f.cards.count { ScreenRegions.isHandZoomRow(it.line) } >= 2
         for (card in f.cards) {
             if (!ScreenRegions.isOpponentPopup(card.line)) continue
             val entering = ScreenRegions.isOpponentCardEntering(card.line)
             if (inspectingHand && !entering) continue
-            val last = opponentLastSeen.put(card.key, now)
-            val wasSettled = opponentSettled.put(card.key, !entering) == true
-            // Neu: länger nicht gesehen – oder dieselbe Karte fliegt erneut herein (zweites Exemplar)
+            val last = game.opponentLastSeen.put(card.key, now)
+            val wasSettled = game.opponentSettled.put(card.key, !entering) == true
+            // The same card flying in again is a second copy
             if (last == null || now - last > opponentRepeatMillis || (entering && wasSettled)) {
-                log { "Gegner: ${describe(card)}" }
+                log { "Opponent: ${describe(card)}" }
                 ids[card.key]?.let { events += GameEvent.OpponentCardSeen(it) }
             }
         }
@@ -578,8 +531,8 @@ class VisionGameTracker(
         private const val MULLIGAN_TIMEOUT_MILLIS = 60_000L
         private const val CHOICE_MEMORY_MILLIS = 6_000L
         private const val BANNER_HOLD_MILLIS = 3_000L
+        private const val LOCALE_WINDOW = 30
 
-        /** Spielt aufgezeichnete Bilder erneut ab (für Tests und Diagnose). */
         fun replay(index: CardNameIndex, frames: List<OcrFrame>): List<GameEvent> {
             val tracker = VisionGameTracker(index)
             return frames.flatMap { tracker.onFrame(it) }

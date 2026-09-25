@@ -1,6 +1,7 @@
 package com.stroexd.hsdecktracker.core.data
 
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
+import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.core.collection.CardCollection
 import com.stroexd.hsdecktracker.core.collection.CollectionImportResult
 import com.stroexd.hsdecktracker.core.deck.Deck
@@ -32,11 +33,14 @@ class DeckRepository(dir: File, private val clock: () -> Long = System::currentT
         store.update { list -> list.filterNot { it.id == id } }
     }
 
-    /** Importiert alle Deck-Codes aus einem Text. Gibt die neu angelegten Decks zurück. */
-    suspend fun importFromText(text: String, db: CardDatabase): List<Deck> {
+    suspend fun importFromText(
+        text: String,
+        db: CardDatabase,
+        defaultName: (HsClass) -> String = { "${it.englishName} Deck" },
+    ): List<Deck> {
         val now = clock()
         val decks = DeckTextParser.parseAll(text).map { parsed ->
-            Deck.fromDefinition(parsed.definition, parsed.name, db, now)
+            Deck.fromDefinition(parsed.definition, parsed.name, db, now, defaultName = defaultName)
         }
         if (decks.isNotEmpty()) store.update { it + decks }
         return decks
@@ -65,7 +69,6 @@ class CollectionRepository(dir: File, private val clock: () -> Long = System::cu
         store.update { it.withNormalCount(dbfId, count).copy(updatedAt = clock()) }
     }
 
-    /** Setzt mehrere normale Anzahlen auf einmal (z. B. „ganzes Set besitzen“). */
     suspend fun setNormalCounts(counts: Map<Int, Int>) {
         store.update { current ->
             counts.entries.fold(current) { acc, (id, count) -> acc.withNormalCount(id, count) }.copy(updatedAt = clock())
@@ -76,7 +79,6 @@ class CollectionRepository(dir: File, private val clock: () -> Long = System::cu
         store.update { it.copy(dust = dust.coerceAtLeast(0)) }
     }
 
-    /** Markiert alle Karten eines Decks als besessen. */
     suspend fun addDeck(cards: Map<Int, Int>) {
         store.update { current ->
             cards.entries.fold(current) { acc, (id, count) -> acc.ensureAtLeast(id, count) }.copy(updatedAt = clock())

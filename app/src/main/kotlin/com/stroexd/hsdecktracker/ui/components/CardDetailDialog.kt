@@ -29,18 +29,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.core.cards.Card
 import com.stroexd.hsdecktracker.core.cards.CardSets
 import com.stroexd.hsdecktracker.core.stats.DrawOdds
 import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.core.util.formatPercent
+import com.stroexd.hsdecktracker.ui.label
 import com.stroexd.hsdecktracker.ui.theme.uiColor
 
-/**
- * Detailansicht einer Karte: Bild, Text, Set, Herstellungskosten, eigene Anzahl
- * und – im Deck-Kontext – Ziehwahrscheinlichkeiten.
- */
 @Composable
 fun CardDetailDialog(
     card: Card,
@@ -68,8 +67,8 @@ fun CardDetailDialog(
                 Text(card.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     ClassBadge(card.hsClass)
-                    Text(card.rarityType.displayName, color = card.rarityType.uiColor, style = MaterialTheme.typography.labelLarge)
-                    Text(card.cardType.displayName, style = MaterialTheme.typography.labelLarge)
+                    Text(card.rarityType.label(), color = card.rarityType.uiColor, style = MaterialTheme.typography.labelLarge)
+                    Text(card.cardType.label(), style = MaterialTheme.typography.labelLarge)
                 }
                 Spacer(Modifier.height(8.dp))
                 if (card.plainText.isNotBlank()) {
@@ -85,33 +84,41 @@ fun CardDetailDialog(
                     )
                 }
                 HorizontalDivider(Modifier.padding(vertical = 10.dp))
-                KeyValue("Set", CardSets.displayName(card.set))
-                if (card.tribes.isNotEmpty()) KeyValue("Typ", card.tribes.joinToString { it.lowercase().replaceFirstChar(Char::uppercase) })
+                KeyValue(stringResource(R.string.card_set), CardSets.displayName(card.set))
+                if (card.tribes.isNotEmpty()) KeyValue(stringResource(R.string.card_tribe), card.tribes.joinToString { it.lowercase().replaceFirstChar(Char::uppercase) })
                 if (card.isCraftable) {
-                    KeyValue("Herstellen", "${formatNumber(card.rarityType.craftCost)} Staub (golden ${formatNumber(card.rarityType.goldenCraftCost)})")
-                    KeyValue("Entzaubern", "${formatNumber(card.rarityType.disenchantValue)} Staub (golden ${formatNumber(card.rarityType.goldenDisenchantValue)})")
+                    KeyValue(
+                        stringResource(R.string.card_craft),
+                        stringResource(R.string.card_dust_golden, formatNumber(card.rarityType.craftCost), formatNumber(card.rarityType.goldenCraftCost)),
+                    )
+                    KeyValue(
+                        stringResource(R.string.card_disenchant),
+                        stringResource(R.string.card_dust_golden, formatNumber(card.rarityType.disenchantValue), formatNumber(card.rarityType.goldenDisenchantValue)),
+                    )
                 } else {
-                    KeyValue("Herstellen", card.howToEarn ?: if (card.set in CardSets.freeSets) "Kostenlos (Kernset)" else "Nicht herstellbar")
+                    val howToGet = card.howToEarn
+                        ?: stringResource(if (card.set in CardSets.freeSets) R.string.card_free_core else R.string.card_not_craftable)
+                    KeyValue(stringResource(R.string.card_craft), howToGet)
                 }
-                if (card.artist.isNotBlank()) KeyValue("Künstler", card.artist)
+                if (card.artist.isNotBlank()) KeyValue(stringResource(R.string.card_artist), card.artist)
                 if (metaInfo != null) KeyValue("Meta", metaInfo)
 
                 if (copiesInDeck != null && copiesInDeck > 0) {
                     HorizontalDivider(Modifier.padding(vertical = 10.dp))
-                    Text("Ziehwahrscheinlichkeit (${copiesInDeck}× im Deck)", style = MaterialTheme.typography.titleSmall)
-                    KeyValue("Starthand am Zug (mit Mulligan)", formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 3, 0)))
-                    KeyValue("Starthand mit Münze (mit Mulligan)", formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 4, 0)))
-                    KeyValue("Bis Zug 3 (am Zug)", formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 3, 2)))
-                    KeyValue("Bis Zug 5 (am Zug)", formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 3, 4)))
+                    Text(stringResource(R.string.odds_title, copiesInDeck), style = MaterialTheme.typography.titleSmall)
+                    KeyValue(stringResource(R.string.odds_opening_first), formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 3, 0)))
+                    KeyValue(stringResource(R.string.odds_opening_coin), formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 4, 0)))
+                    KeyValue(stringResource(R.string.odds_turn_3), formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 3, 2)))
+                    KeyValue(stringResource(R.string.odds_turn_5), formatPercent(DrawOdds.withMulligan(deckSize, copiesInDeck, 3, 4)))
                 }
 
                 if (owned != null) {
                     HorizontalDivider(Modifier.padding(vertical = 10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("In deiner Sammlung", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.in_your_collection), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                         if (onOwnedChange != null) {
                             FilledTonalIconButton(onClick = { onOwnedChange((owned - 1).coerceAtLeast(0)) }) {
-                                Icon(Icons.Filled.Remove, contentDescription = "Weniger")
+                                Icon(Icons.Filled.Remove, contentDescription = stringResource(R.string.less))
                             }
                         }
                         Text(
@@ -121,14 +128,14 @@ fun CardDetailDialog(
                         )
                         if (onOwnedChange != null) {
                             FilledTonalIconButton(onClick = { onOwnedChange(owned + 1) }) {
-                                Icon(Icons.Filled.Add, contentDescription = "Mehr")
+                                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.more))
                             }
                         }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("Schließen") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
                 }
                 Spacer(Modifier.width(1.dp))
             }

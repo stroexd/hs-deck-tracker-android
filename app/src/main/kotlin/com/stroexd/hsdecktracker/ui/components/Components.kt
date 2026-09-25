@@ -63,7 +63,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 import coil3.compose.AsyncImage
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.core.cards.Card
 import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.core.cards.Rarity
@@ -71,6 +73,7 @@ import com.stroexd.hsdecktracker.core.collection.CraftAnalysis
 import com.stroexd.hsdecktracker.core.data.CardRepository
 import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.core.util.formatPercent
+import com.stroexd.hsdecktracker.ui.label
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.uiColor
 import com.stroexd.hsdecktracker.ui.theme.winRateColor
@@ -89,12 +92,11 @@ fun ClassBadge(cls: HsClass, modifier: Modifier = Modifier) {
         ) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(cls.uiColor))
             Spacer(Modifier.width(6.dp))
-            Text(cls.displayName, style = MaterialTheme.typography.labelMedium)
+            Text(cls.label(), style = MaterialTheme.typography.labelMedium)
         }
     }
 }
 
-/** Blauer Manakristall mit Kosten. */
 @Composable
 fun ManaGem(cost: Int, modifier: Modifier = Modifier, size: Dp = 24.dp) {
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
@@ -115,9 +117,6 @@ fun ManaGem(cost: Int, modifier: Modifier = Modifier, size: Dp = 24.dp) {
     }
 }
 
-/**
- * Deck-Zeile im Stil von HDT/HSReplay: Mana, Name über dem Kartenausschnitt, Anzahl.
- */
 @Composable
 fun CardTile(
     card: Card?,
@@ -230,7 +229,6 @@ fun CardImage(card: Card, locale: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Manakurve 0–7+ als Balkendiagramm. */
 @Composable
 fun ManaCurveChart(curve: List<Int>, modifier: Modifier = Modifier, barHeight: Dp = 64.dp) {
     val max = (curve.maxOrNull() ?: 0).coerceAtLeast(1)
@@ -267,21 +265,18 @@ fun ManaCurveChart(curve: List<Int>, modifier: Modifier = Modifier, barHeight: D
 @Composable
 fun DustLabel(amount: Int, modifier: Modifier = Modifier, color: Color = HsColors.Dust, prefix: String = "") {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.Diamond, contentDescription = "Arkanstaub", tint = color, modifier = Modifier.size(14.dp))
+        Icon(Icons.Filled.Diamond, contentDescription = stringResource(R.string.arcane_dust), tint = color, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(3.dp))
         Text("$prefix${formatNumber(amount)}", color = color, style = MaterialTheme.typography.labelLarge)
     }
 }
 
-/**
- * Zeigt an, ob ein Deck mit der Sammlung baubar ist bzw. wie viel Staub fehlt.
- */
 @Composable
 fun CraftCostLabel(analysis: CraftAnalysis?, collectionEmpty: Boolean, dust: Int, modifier: Modifier = Modifier) {
     when {
         analysis == null -> Unit
         collectionEmpty -> Text(
-            "Sammlung fehlt",
+            stringResource(R.string.collection_missing),
             modifier = modifier,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -292,7 +287,7 @@ fun CraftCostLabel(analysis: CraftAnalysis?, collectionEmpty: Boolean, dust: Int
             color = HsColors.Win.copy(alpha = 0.18f),
         ) {
             Text(
-                "✓ Baubar",
+                stringResource(R.string.buildable_badge),
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                 color = HsColors.Win,
                 style = MaterialTheme.typography.labelMedium,
@@ -405,7 +400,7 @@ fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "Suchen …",
+    placeholder: String = stringResource(R.string.search_placeholder),
 ) {
     OutlinedTextField(
         value = value,
@@ -416,7 +411,7 @@ fun SearchField(
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
         trailingIcon = {
             if (value.isNotEmpty()) {
-                IconButton(onClick = { onValueChange("") }) { Icon(Icons.Filled.Close, contentDescription = "Leeren") }
+                IconButton(onClick = { onValueChange("") }) { Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.clear)) }
             }
         },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -424,7 +419,6 @@ fun SearchField(
     )
 }
 
-/** Horizontale Chip-Leiste zur Auswahl (Mehrfach- oder Einfachauswahl). */
 @Composable
 fun <T> ChipRow(
     options: List<T>,
@@ -469,14 +463,14 @@ fun ClassPickerDialog(
                         Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(10.dp).clip(CircleShape).background(cls.uiColor))
                             Spacer(Modifier.width(8.dp))
-                            Text(cls.displayName)
+                            Text(cls.label())
                         }
                     }
                 }
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
@@ -493,11 +487,10 @@ fun ConfirmDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = { Button(onClick = { onConfirm(); onDismiss() }) { Text(confirmLabel) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
-/** Kleine Kennzahl-Zeile „Label: Wert“. */
 @Composable
 fun KeyValue(label: String, value: String, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().padding(vertical = 2.dp)) {

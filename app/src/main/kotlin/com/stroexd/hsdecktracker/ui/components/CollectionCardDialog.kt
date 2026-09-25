@@ -4,16 +4,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.core.cards.Card
 import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.meta.MetaCardStats
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import com.stroexd.hsdecktracker.core.collection.OwnedCard
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.labelRes
 import kotlinx.coroutines.launch
 
-/** Kartendetails inkl. Bearbeitung der eigenen Anzahl in der Sammlung. */
 @Composable
 fun CollectionCardDialog(
     card: Card,
@@ -26,8 +28,10 @@ fun CollectionCardDialog(
     val collection by container.collection.collection.collectAsStateWithLifecycle()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val metaState by container.meta.state.collectAsStateWithLifecycle()
+    val cardState by container.cards.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val owned = collection.cards[card.dbfId] ?: OwnedCard()
-    val metaInfo = remember(metaState, card.dbfId, settings.standardSetOverrides) {
+    val metaInfo = remember(metaState, card.dbfId, settings.standardSetOverrides, context) {
         val format = if (settings.formatRules.isLegal(card, GameFormat.STANDARD)) GameFormat.STANDARD else GameFormat.WILD
         val decks = metaState.snapshots[format]?.decks
         if (decks.isNullOrEmpty()) {
@@ -36,15 +40,20 @@ fun CollectionCardDialog(
             val popularity = MetaCardStats.popularity(decks)[card.dbfId]
             val topClass = popularity?.topClass
             if (popularity == null || topClass == null) {
-                "Im ${format.displayName}-Meta kaum gespielt"
+                context.getString(R.string.meta_rarely_played, context.getString(format.labelRes()))
             } else {
-                "In ${formatPercent(popularity.classShares[topClass], 0)} der ${topClass.displayName}-Decks (${format.displayName})"
+                context.getString(
+                    R.string.meta_share_of_class,
+                    formatPercent(popularity.classShares[topClass], 0),
+                    context.getString(topClass.labelRes()),
+                    context.getString(format.labelRes()),
+                )
             }
         }
     }
     CardDetailDialog(
         card = card,
-        locale = settings.cardLocale,
+        locale = cardState.db.locale,
         onDismiss = onDismiss,
         owned = owned.total,
         onOwnedChange = { newTotal ->

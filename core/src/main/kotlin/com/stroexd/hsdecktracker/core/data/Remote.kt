@@ -22,12 +22,32 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-class HttpException(val code: Int, message: String) : IOException(message)
+class HttpException(val code: Int) : IOException("HTTP $code")
+
+sealed interface LoadError {
+    /** HSReplay refuses some rank/time filters without premium. */
+    data class Forbidden(val code: Int) : LoadError
+    data class Http(val code: Int) : LoadError
+    data class Network(val detail: String) : LoadError
+    data object NoData : LoadError
+    data object InvalidUrl : LoadError
+    data object NoDecksAtUrl : LoadError
+
+    companion object {
+        fun of(e: Exception): LoadError = when {
+            e is LoadException -> e.error
+            e is HttpException && (e.code == 401 || e.code == 403) -> Forbidden(e.code)
+            e is HttpException -> Http(e.code)
+            else -> Network(e.message ?: e.javaClass.simpleName)
+        }
+    }
+}
+
+class LoadException(val error: LoadError) : IOException(error.toString())
 
 data class HttpResponse(val code: Int, val body: String)
 
 class HttpClient(private val client: OkHttpClient = defaultClient()) {
-
     suspend fun get(url: String, headers: Map<String, String> = emptyMap()): HttpResponse = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
@@ -36,7 +56,7 @@ class HttpClient(private val client: OkHttpClient = defaultClient()) {
             .build()
         client.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw HttpException(response.code, "HTTP ${response.code}")
+            if (!response.isSuccessful) throw HttpException(response.code)
             HttpResponse(response.code, body)
         }
     }
@@ -57,12 +77,11 @@ class HttpClient(private val client: OkHttpClient = defaultClient()) {
 data class CardDataState(
     val db: CardDatabase = CardDatabase.EMPTY,
     val loading: Boolean = false,
-    val error: String? = null,
+    val error: LoadError? = null,
     val lastUpdated: Long? = null,
     val locale: String = "",
 )
 
-/** Lädt die Kartendatenbank von HearthstoneJSON und cached sie lokal. */
 class CardRepository(
     private val dir: File,
     private val http: HttpClient,
@@ -100,7 +119,7 @@ class CardRepository(
         try {
             val json = http.getText(CARDS_URL.format(locale))
             val db = withContext(Dispatchers.Default) { CardDatabase.parse(json, locale) }
-            if (db.isEmpty) throw IOException("Leere Kartendatenbank")
+            if (db.isEmpty) throw LoadException(LoadError.NoData)
             withContext(Dispatchers.IO) {
                 dir.mkdirs()
                 val tmp = File(dir, "cards_$locale.json.tmp")
@@ -114,9 +133,7 @@ class CardRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            _state.update {
-                it.copy(loading = false, error = "Kartendaten konnten nicht geladen werden (${e.message ?: e.javaClass.simpleName}).")
-            }
+            _state.update { it.copy(loading = false, error = LoadError.of(e)) }
         }
     }
 
@@ -136,10 +153,9 @@ class CardRepository(
 data class MetaState(
     val snapshots: Map<GameFormat, MetaSnapshot> = emptyMap(),
     val loading: Boolean = false,
-    val error: String? = null,
+    val error: LoadError? = null,
 )
 
-/** Lädt Meta-Decks (HSReplay oder eigene Deck-Code-Liste) und cached sie. */
 class MetaRepository(
     private val dir: File,
     private val http: HttpClient,
@@ -182,13 +198,7 @@ class MetaRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            val message = when {
-                e is HttpException && (e.code == 401 || e.code == 403) ->
-                    "HSReplay hat den Zugriff verweigert (HTTP ${e.code}). Evtl. ist der gewählte Rang/Zeitraum nur für Premium verfügbar – versuche Bronze–Gold / Aktueller Patch."
-                e is HttpException -> "Server-Fehler (HTTP ${e.code})."
-                else -> "Meta-Decks konnten nicht geladen werden: ${e.message ?: e.javaClass.simpleName}"
-            }
-            _state.update { it.copy(loading = false, error = message) }
+            _state.update { it.copy(loading = false, error = LoadError.of(e)) }
         }
     }
 
@@ -199,9 +209,9 @@ class MetaRepository(
             }.getOrDefault(emptyMap())
         }
         val gameType = if (format == GameFormat.WILD) "RANKED_WILD" else "RANKED_STANDARD"
-        val url = "$DECKS_URL?GameType=$gameType&LeagueRankRange=${settings.metaRankRange.apiValue}" +
-            "&Region=ALL&TimeRange=${settings.metaTimeRange.apiValue}"
-        // HSReplay antwortet mit 202, solange die Abfrage berechnet wird.
+        val url = "$DECKS_URL?GameType=$gameType&LeagueRankRange=${settings.metaRankRange.name}" +
+            "&Region=ALL&TimeRange=${settings.metaTimeRange.name}"
+        // HSReplay answers 202 while the query is still being computed.
         var body = ""
         for (attempt in 0 until 6) {
             val response = http.get(url, jsonHeaders)
@@ -211,7 +221,7 @@ class MetaRepository(
             }
             delay(2500L * (attempt + 1))
         }
-        if (body.isBlank()) throw IOException("HSReplay hat keine Daten geliefert – später erneut versuchen.")
+        if (body.isBlank()) throw LoadException(LoadError.NoData)
         val decks = HsReplayParser.parseDecks(body, archetypes, format)
         return MetaSnapshot(decks = decks, fetchedAt = clock(), source = "HSReplay.net", description = description)
     }
@@ -224,17 +234,18 @@ class MetaRepository(
     ): MetaSnapshot {
         val url = settings.metaCustomUrl.trim()
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            throw IOException("Bitte in den Einstellungen eine gültige URL für die Deck-Liste eintragen.")
+            throw LoadException(LoadError.InvalidUrl)
         }
         val decks = DeckListParser.parse(http.getText(url), db)
             .filter { format == GameFormat.WILD || it.format == format }
-        if (decks.isEmpty()) throw IOException("Unter der URL wurden keine ${format.displayName}-Deck-Codes gefunden.")
+        if (decks.isEmpty()) throw LoadException(LoadError.NoDecksAtUrl)
         return MetaSnapshot(decks = decks, fetchedAt = clock(), source = url, description = description)
     }
 
+    /** Identifies the query a cached snapshot was made for. */
     private fun describe(format: GameFormat, settings: AppSettings): String = when (settings.metaSource) {
-        MetaSourceType.HSREPLAY -> "HSReplay · ${format.displayName} · ${settings.metaRankRange.displayName} · ${settings.metaTimeRange.displayName}"
-        MetaSourceType.CUSTOM_URL -> "Eigene Liste · ${settings.metaCustomUrl.trim()}"
+        MetaSourceType.HSREPLAY -> "hsreplay|$format|${settings.metaRankRange}|${settings.metaTimeRange}"
+        MetaSourceType.CUSTOM_URL -> "url|$format|${settings.metaCustomUrl.trim()}"
     }
 
     companion object {

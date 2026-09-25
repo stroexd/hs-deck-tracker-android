@@ -2,6 +2,7 @@
 
 package com.stroexd.hsdecktracker.ui.stats
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -62,7 +63,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,6 +82,7 @@ import com.stroexd.hsdecktracker.core.stats.StatsFilter
 import com.stroexd.hsdecktracker.core.stats.WinRate
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.label
 import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.ChipRow
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
@@ -90,11 +95,16 @@ import com.stroexd.hsdecktracker.ui.theme.uiColor
 import com.stroexd.hsdecktracker.ui.theme.winRateColor
 import kotlinx.coroutines.launch
 
-private enum class Period(val label: String, val days: Int?) { WEEK("7 Tage", 7), MONTH("30 Tage", 30), ALL("Gesamt", null) }
+private enum class Period(@StringRes val label: Int, val days: Int?) {
+    WEEK(R.string.period_week, 7),
+    MONTH(R.string.period_month, 30),
+    ALL(R.string.period_all, null),
+}
 
 @Composable
 fun StatsScreen(navController: NavHostController) {
     val container = LocalAppContainer.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val matches by container.matches.matches.collectAsStateWithLifecycle()
     val decks by container.decks.decks.collectAsStateWithLifecycle()
@@ -123,20 +133,20 @@ fun StatsScreen(navController: NavHostController) {
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Statistik") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.tab_stats)) }) },
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Partie eintragen") },
+                text = { Text(stringResource(R.string.add_match)) },
             )
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TabRow(selectedTabIndex = tab) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Übersicht") })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Partien (${matches.size})") })
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.overview)) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.games_with_count, matches.size)) })
             }
             if (tab == 1) {
                 MatchHistoryContent(
@@ -149,12 +159,12 @@ fun StatsScreen(navController: NavHostController) {
             }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
                 item {
-                    ChipRow(Period.entries.toList(), { it == period }, { it.label }, { period = it }, Modifier.padding(top = 8.dp))
+                    ChipRow(Period.entries.toList(), { it == period }, { context.getString(it.label) }, { period = it }, Modifier.padding(top = 8.dp))
                 }
                 item {
                     FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf<GameFormat?>(null, GameFormat.STANDARD, GameFormat.WILD).forEach { f ->
-                            FilterChip(selected = format == f, onClick = { format = f }, label = { Text(f?.displayName ?: "Alle Formate") })
+                            FilterChip(selected = format == f, onClick = { format = f }, label = { Text(f?.label() ?: stringResource(R.string.all_formats)) })
                         }
                         Box {
                             FilterChip(
@@ -162,14 +172,14 @@ fun StatsScreen(navController: NavHostController) {
                                 onClick = { deckMenu = true },
                                 label = {
                                     Text(
-                                        deckNames.firstOrNull { it.first == deckId }?.second ?: "Alle Decks",
+                                        deckNames.firstOrNull { it.first == deckId }?.second ?: stringResource(R.string.all_decks),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 },
                             )
                             DropdownMenu(expanded = deckMenu, onDismissRequest = { deckMenu = false }) {
-                                DropdownMenuItem(text = { Text("Alle Decks") }, onClick = { deckId = null; deckMenu = false })
+                                DropdownMenuItem(text = { Text(stringResource(R.string.all_decks)) }, onClick = { deckId = null; deckMenu = false })
                                 deckNames.forEach { (id, name) ->
                                     DropdownMenuItem(text = { Text(name) }, onClick = { deckId = id; deckMenu = false })
                                 }
@@ -181,8 +191,8 @@ fun StatsScreen(navController: NavHostController) {
                     item {
                         EmptyState(
                             icon = Icons.Filled.QueryStats,
-                            title = "Noch keine Partien",
-                            message = "Nutze den Tracker (Siege/Niederlagen werden gespeichert) oder trage Partien manuell ein.",
+                            title = stringResource(R.string.no_games_title),
+                            message = stringResource(R.string.no_games_message),
                         )
                     }
                     return@LazyColumn
@@ -190,43 +200,45 @@ fun StatsScreen(navController: NavHostController) {
                 item {
                     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatTile("Siegquote", formatPercent(overall.rate), Modifier.weight(1f), winRateColor(overall.rate))
-                            StatTile("Partien", "${overall.games}", Modifier.weight(1f))
+                            StatTile(stringResource(R.string.sort_winrate), formatPercent(overall.rate), Modifier.weight(1f), winRateColor(overall.rate))
+                            StatTile(stringResource(R.string.games), "${overall.games}", Modifier.weight(1f))
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatTile("Bilanz", overall.label, Modifier.weight(1f))
+                            StatTile(stringResource(R.string.record), overall.label, Modifier.weight(1f))
                             StatTile(
-                                "Serie",
-                                streak?.let { "${it.length}× ${if (it.result == MatchResult.WIN) "S" else "N"}" } ?: "–",
+                                stringResource(R.string.streak),
+                                streak?.let {
+                                    stringResource(if (it.result == MatchResult.WIN) R.string.streak_wins else R.string.streak_losses, it.length)
+                                } ?: "–",
                                 Modifier.weight(1f),
                                 if (streak?.result == MatchResult.WIN) HsColors.Win else if (streak != null) HsColors.Loss else MaterialTheme.colorScheme.onSurface,
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            StatTile("Am Zug", "${formatPercent(first.rate, 0)} (${first.games})", Modifier.weight(1f), winRateColor(first.rate))
-                            StatTile("Mit Münze", "${formatPercent(coin.rate, 0)} (${coin.games})", Modifier.weight(1f), winRateColor(coin.rate))
+                            StatTile(stringResource(R.string.going_first), "${formatPercent(first.rate, 0)} (${first.games})", Modifier.weight(1f), winRateColor(first.rate))
+                            StatTile(stringResource(R.string.with_coin), "${formatPercent(coin.rate, 0)} (${coin.games})", Modifier.weight(1f), winRateColor(coin.rate))
                         }
                     }
                 }
                 if (trend.size >= 3) {
                     item {
                         Column(Modifier.padding(horizontal = 16.dp)) {
-                            SectionHeader("Verlauf (gleitend, 10 Partien)")
+                            SectionHeader(stringResource(R.string.trend_rolling))
                             TrendChart(trend, Modifier.fillMaxWidth().height(140.dp))
                         }
                     }
                 }
-                item { SectionHeader("Matchups", Modifier.padding(horizontal = 16.dp)) }
+                item { SectionHeader(stringResource(R.string.matchups), Modifier.padding(horizontal = 16.dp)) }
                 items(byClass.entries.toList(), key = { "mu-" + it.key.name }) { (cls, rate) ->
                     MatchupRow(cls, rate)
                 }
                 if (deckId == null && byDeck.size > 1) {
-                    item { SectionHeader("Decks", Modifier.padding(horizontal = 16.dp)) }
+                    item { SectionHeader(stringResource(R.string.tab_decks), Modifier.padding(horizontal = 16.dp)) }
                     items(byDeck, key = { "deck-" + (it.deckId ?: it.deckName) }) { deckRate ->
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(10.dp).clip(CircleShape).background(deckRate.playerClass.uiColor))
                             Spacer(Modifier.width(8.dp))
-                            Text(deckRate.deckName, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(deckRate.deckName.ifBlank { stringResource(R.string.no_deck) }, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 "${deckRate.winRate.label} · ${formatPercent(deckRate.winRate.rate, 0)}",
                                 color = winRateColor(deckRate.winRate.rate),
@@ -236,8 +248,8 @@ fun StatsScreen(navController: NavHostController) {
                     }
                 }
                 item {
-                    SectionHeader("Letzte Partien", Modifier.padding(horizontal = 16.dp)) {
-                        TextButton(onClick = { tab = 1 }) { Text("Alle ${matches.size} anzeigen") }
+                    SectionHeader(stringResource(R.string.recent_games), Modifier.padding(horizontal = 16.dp)) {
+                        TextButton(onClick = { tab = 1 }) { Text(stringResource(R.string.show_all_count, matches.size)) }
                     }
                 }
                 items(filtered.take(5), key = { it.id }) { match ->
@@ -263,9 +275,14 @@ fun StatsScreen(navController: NavHostController) {
     }
     toDelete?.let { match ->
         ConfirmDialog(
-            title = "Partie löschen?",
-            message = "${match.deckName.ifBlank { "Ohne Deck" }} gegen ${match.opponentClass.displayName} (${match.result.displayName})",
-            confirmLabel = "Löschen",
+            title = stringResource(R.string.delete_match_title),
+            message = stringResource(
+                R.string.delete_match_message,
+                match.deckName.ifBlank { stringResource(R.string.no_deck) },
+                match.opponentClass.label(),
+                match.result.label(),
+            ),
+            confirmLabel = stringResource(R.string.delete),
             onConfirm = { scope.launch { container.matches.delete(match.id) } },
             onDismiss = { toDelete = null },
         )
@@ -308,7 +325,6 @@ private fun TrendChart(values: List<Double>, modifier: Modifier = Modifier) {
         Canvas(Modifier.fillMaxSize().padding(12.dp)) {
             val w = size.width
             val h = size.height
-            // 50-%-Linie
             drawLine(
                 gridColor,
                 Offset(0f, h / 2),
@@ -337,32 +353,32 @@ private fun AddMatchDialog(decks: List<Deck>, onDismiss: () -> Unit, onSave: (Ma
     var deckMenu by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Partie eintragen") },
+        title = { Text(stringResource(R.string.add_match)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Dein Deck", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.your_deck), style = MaterialTheme.typography.labelLarge)
                 Box {
-                    OutlinedButton(onClick = { deckMenu = true }) { Text(deck?.name ?: "Ohne Deck", maxLines = 1) }
+                    OutlinedButton(onClick = { deckMenu = true }) { Text(deck?.name ?: stringResource(R.string.no_deck), maxLines = 1) }
                     DropdownMenu(expanded = deckMenu, onDismissRequest = { deckMenu = false }) {
-                        DropdownMenuItem(text = { Text("Ohne Deck") }, onClick = { deck = null; deckMenu = false })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.no_deck)) }, onClick = { deck = null; deckMenu = false })
                         decks.forEach { d -> DropdownMenuItem(text = { Text(d.name) }, onClick = { deck = d; deckMenu = false }) }
                     }
                 }
-                Text("Gegner", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.opponent), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     HsClass.playable.forEach { cls ->
-                        FilterChip(selected = opponent == cls, onClick = { opponent = cls }, label = { Text(cls.displayName) })
+                        FilterChip(selected = opponent == cls, onClick = { opponent = cls }, label = { Text(cls.label()) })
                     }
                 }
-                Text("Ergebnis", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.result), style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     MatchResult.entries.forEach { r ->
-                        FilterChip(selected = result == r, onClick = { result = r }, label = { Text(r.displayName) })
+                        FilterChip(selected = result == r, onClick = { result = r }, label = { Text(r.label()) })
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    FilterChip(selected = wentFirst == true, onClick = { wentFirst = if (wentFirst == true) null else true }, label = { Text("Am Zug") })
-                    FilterChip(selected = wentFirst == false, onClick = { wentFirst = if (wentFirst == false) null else false }, label = { Text("Münze") })
+                    FilterChip(selected = wentFirst == true, onClick = { wentFirst = if (wentFirst == true) null else true }, label = { Text(stringResource(R.string.going_first)) })
+                    FilterChip(selected = wentFirst == false, onClick = { wentFirst = if (wentFirst == false) null else false }, label = { Text(stringResource(R.string.coin)) })
                 }
             }
         },
@@ -381,8 +397,8 @@ private fun AddMatchDialog(decks: List<Deck>, onDismiss: () -> Unit, onSave: (Ma
                         source = MatchSource.MANUAL,
                     ),
                 )
-            }) { Text("Speichern") }
+            }) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

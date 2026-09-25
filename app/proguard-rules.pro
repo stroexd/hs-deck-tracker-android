@@ -1,4 +1,4 @@
-# kotlinx.serialization – eigene @Serializable-Klassen behalten
+# kotlinx.serialization: keep our @Serializable classes
 -keepattributes *Annotation*, InnerClasses, Signature
 -dontnote kotlinx.serialization.**
 -keep,includedescriptorclasses class com.stroexd.hsdecktracker.**$$serializer { *; }
@@ -10,7 +10,7 @@
 }
 -keepclassmembers enum com.stroexd.hsdecktracker.** { *; }
 
-# OkHttp optionale Plattformen
+# OkHttp optional platforms
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**

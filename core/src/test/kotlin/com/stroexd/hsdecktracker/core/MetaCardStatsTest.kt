@@ -39,7 +39,6 @@ class MetaCardStatsTest {
     fun recommendationsPreferCardsThatCompleteDecks() {
         val collection = CardCollection(cards = mapOf(FIREBALL to OwnedCard(2), RARE_NEUTRAL to OwnedCard(2)))
         val recs = MetaCardStats.craftRecommendations(decks, collection, TestCards.db)
-        // Leeroy komplettiert Deck a und c; das Epische nur b (2 Kopien); die Belohnungskarte ist nicht herstellbar.
         assertEquals(listOf(LEEROY, EPIC_MAGE), recs.map { it.card.dbfId })
         assertEquals(2, recs.first().completesDecks)
         assertEquals(1600, recs.first().dustCost)

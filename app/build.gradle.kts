@@ -19,7 +19,7 @@ android {
         versionName = "1.1.0"
 
         ndk {
-            // Texterkennung (ML Kit) bringt native Bibliotheken mit – nur ARM für echte Geräte.
+            // ML Kit ships native libraries; real devices are ARM only
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
     }
@@ -29,7 +29,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Mit dem Debug-Schlüssel signiert, damit die Release-APK direkt installierbar ist.
+            // Signed with the debug key so the release APK can be installed directly
             signingConfig = signingConfigs.getByName("debug")
         }
         debug {

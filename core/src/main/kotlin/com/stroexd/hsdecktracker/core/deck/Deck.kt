@@ -14,7 +14,6 @@ data class Deck(
     val name: String,
     val heroClass: HsClass,
     val format: GameFormat = GameFormat.STANDARD,
-    /** dbfId → Anzahl */
     val cards: Map<Int, Int> = emptyMap(),
     val sideboards: List<SideboardCard> = emptyList(),
     val heroDbfId: Int? = null,
@@ -43,17 +42,17 @@ data class Deck(
     }
 
     companion object {
-        /** Erzeugt ein Deck aus einem dekodierten Deck-Code. */
         fun fromDefinition(
             definition: DeckDefinition,
             name: String?,
             db: CardDatabase,
             now: Long,
             source: DeckSource = DeckSource.IMPORT,
+            defaultName: (HsClass) -> String = { "${it.englishName} Deck" },
         ): Deck {
             val heroClass = detectClass(definition, db)
             return Deck(
-                name = name?.takeIf { it.isNotBlank() } ?: "${heroClass.displayName}-Deck",
+                name = name?.takeIf { it.isNotBlank() } ?: defaultName(heroClass),
                 heroClass = heroClass,
                 format = definition.format,
                 cards = definition.cards,
@@ -86,14 +85,12 @@ data class Deck(
     }
 }
 
-/** Ein in Text gefundener Deck-Code, optional mit Namen aus der `### Name`-Zeile. */
 data class ParsedDeckText(val code: String, val name: String?, val definition: DeckDefinition)
 
 object DeckTextParser {
     private val codeRegex = Regex("AAE[A-Za-z0-9+/]{6,}={0,2}")
     private val nameRegex = Regex("^\\s*###\\s*(.+?)\\s*$")
 
-    /** Findet alle gültigen Deck-Codes in einem Text (z. B. aus der Zwischenablage). */
     fun parseAll(text: String): List<ParsedDeckText> {
         val result = mutableListOf<ParsedDeckText>()
         var pendingName: String? = null

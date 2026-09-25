@@ -28,7 +28,6 @@ data class MetaDeck(
     val sideboards: List<SideboardCard> = emptyList(),
     val archetypeId: Int? = null,
     val archetypeName: String? = null,
-    /** Siegquote 0..1 */
     val winRate: Double? = null,
     val totalGames: Int? = null,
     val avgTurns: Double? = null,
@@ -36,7 +35,7 @@ data class MetaDeck(
     val name: String? = null,
 ) {
     val displayName: String
-        get() = archetypeName ?: name ?: "${heroClass.displayName}-Deck"
+        get() = archetypeName ?: name ?: "${heroClass.englishName} Deck"
 
     val deckCode: String
         get() = DeckCode.encode(
@@ -66,13 +65,7 @@ data class MetaSnapshot(
 
 class MetaParseException(message: String) : IllegalArgumentException(message)
 
-/**
- * Parser für die (inoffiziellen, öffentlich vom Browser genutzten) HSReplay-Endpunkte:
- * - `/api/v1/archetypes/` → Liste der Archetypen mit Namen
- * - `/analytics/query/list_decks_by_win_rate_v2/` → Decks je Klasse mit Siegquote & Spielen
- */
 object HsReplayParser {
-
     fun parseArchetypes(json: String): Map<Int, String> {
         val root = AppJson.parseToJsonElement(json)
         val list = when (root) {
@@ -90,9 +83,9 @@ object HsReplayParser {
 
     fun parseDecks(json: String, archetypes: Map<Int, String>, format: GameFormat): List<MetaDeck> {
         val root = AppJson.parseToJsonElement(json) as? JsonObject
-            ?: throw MetaParseException("Unerwartete Antwort von HSReplay")
-        val series = root["series"] as? JsonObject ?: throw MetaParseException("Keine Deck-Daten in der Antwort")
-        val data = series["data"] as? JsonObject ?: throw MetaParseException("Keine Deck-Daten in der Antwort")
+            ?: throw MetaParseException("Unexpected HSReplay response")
+        val series = root["series"] as? JsonObject ?: throw MetaParseException("No deck data in response")
+        val data = series["data"] as? JsonObject ?: throw MetaParseException("No deck data in response")
         val decks = mutableListOf<MetaDeck>()
         for ((classKey, value) in data) {
             val heroClass = HsClass.fromString(classKey)
@@ -121,7 +114,6 @@ object HsReplayParser {
         return decks
     }
 
-    /** `deck_list` ist ein JSON-String wie `"[[1234,2],[5678,1]]"` oder direkt ein Array. */
     private fun parseCardList(element: JsonElement?): Map<Int, Int>? {
         val array = asArray(element) ?: return null
         val cards = linkedMapOf<Int, Int>()
@@ -159,7 +151,6 @@ object HsReplayParser {
     private fun JsonObject.double(key: String): Double? = (this[key] as? JsonPrimitive)?.doubleOrNull
 }
 
-/** Macht aus beliebigem Text mit Deck-Codes (z. B. einer eigenen Meta-Liste) Meta-Decks. */
 object DeckListParser {
     fun parse(text: String, db: CardDatabase): List<MetaDeck> =
         DeckTextParser.parseAll(text).mapIndexed { index, parsed ->
@@ -177,18 +168,14 @@ object DeckListParser {
 
 data class DeckPrediction(
     val deck: MetaDeck,
-    /** Wie viele der gesehenen Karten im Deck vorkommen. */
     val matchedCards: Int,
     val seenCards: Int,
-    /** Karten des Decks, die noch nicht gesehen wurden (dbfId → Anzahl). */
     val remainingCards: Map<Int, Int>,
 ) {
     val matchFraction: Double get() = if (seenCards == 0) 0.0 else matchedCards.toDouble() / seenCards
 }
 
-/** Sagt anhand gesehener Gegnerkarten das wahrscheinlichste Meta-Deck vorher. */
 object OpponentPredictor {
-
     fun predict(
         opponentClass: HsClass,
         seenCards: List<Int>,

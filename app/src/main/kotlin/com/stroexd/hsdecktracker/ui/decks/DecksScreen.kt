@@ -2,6 +2,7 @@
 
 package com.stroexd.hsdecktracker.ui.decks
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,11 +61,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.collection.CraftingCalculator
 import com.stroexd.hsdecktracker.core.deck.Deck
@@ -80,6 +84,10 @@ import com.stroexd.hsdecktracker.ui.components.ClassBadge
 import com.stroexd.hsdecktracker.ui.components.ClassPickerDialog
 import com.stroexd.hsdecktracker.ui.components.CraftCostLabel
 import com.stroexd.hsdecktracker.ui.components.EmptyState
+import com.stroexd.hsdecktracker.ui.defaultDeckName
+import com.stroexd.hsdecktracker.ui.label
+import com.stroexd.hsdecktracker.ui.labelRes
+import com.stroexd.hsdecktracker.ui.message
 import com.stroexd.hsdecktracker.ui.navigateTopLevel
 import com.stroexd.hsdecktracker.ui.readClipboardText
 import com.stroexd.hsdecktracker.ui.rememberComputed
@@ -89,7 +97,12 @@ import com.stroexd.hsdecktracker.ui.theme.winRateColor
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import kotlinx.coroutines.launch
 
-private enum class DeckSort(val label: String) { RECENT("Zuletzt"), NAME("Name"), DUST("Staubkosten"), WINRATE("Siegquote") }
+private enum class DeckSort(@StringRes val label: Int) {
+    RECENT(R.string.sort_recent),
+    NAME(R.string.sort_name),
+    DUST(R.string.sort_dust),
+    WINRATE(R.string.sort_winrate),
+}
 
 private data class DeckRow(val deck: Deck, val analysis: com.stroexd.hsdecktracker.core.collection.CraftAnalysis, val winRate: WinRate)
 
@@ -151,16 +164,16 @@ fun DecksScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Meine Decks") },
+                title = { Text(stringResource(R.string.my_decks)) },
                 actions = {
                     IconButton(onClick = { navController.navigate(Routes.TRACKER) }) {
-                        Icon(Icons.Filled.Layers, contentDescription = "Tracker")
+                        Icon(Icons.Filled.Layers, contentDescription = stringResource(R.string.tracker))
                     }
                     IconButton(onClick = { navController.navigate(Routes.CRAFT_CHECK) }) {
-                        Icon(Icons.Filled.Calculate, contentDescription = "Deck-Code prüfen")
+                        Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.check_deck_code))
                     }
                     IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Einstellungen")
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
                     }
                 },
             )
@@ -170,11 +183,11 @@ fun DecksScreen(
                 ExtendedFloatingActionButton(
                     onClick = { showAddMenu = true },
                     icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text("Deck hinzufügen") },
+                    text = { Text(stringResource(R.string.add_deck)) },
                 )
                 DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
                     DropdownMenuItem(
-                        text = { Text("Deck-Code importieren") },
+                        text = { Text(stringResource(R.string.import_deck_code)) },
                         leadingIcon = { Icon(Icons.Filled.ContentPaste, contentDescription = null) },
                         onClick = {
                             showAddMenu = false
@@ -183,7 +196,7 @@ fun DecksScreen(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Neues Deck bauen") },
+                        text = { Text(stringResource(R.string.build_new_deck)) },
                         leadingIcon = { Icon(Icons.Filled.Build, contentDescription = null) },
                         onClick = {
                             showAddMenu = false
@@ -202,7 +215,7 @@ fun DecksScreen(
             item {
                 PlayCard(
                     active = recognition.active,
-                    status = recognition.phaseLabel,
+                    status = stringResource(recognition.phase.labelRes()),
                     onPlay = startTracking,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 )
@@ -210,7 +223,7 @@ fun DecksScreen(
             if (cardState.loading && cardState.db.isEmpty) {
                 item {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Kartendatenbank wird geladen …", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.loading_cards), style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(6.dp))
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                     }
@@ -219,9 +232,9 @@ fun DecksScreen(
             cardState.error?.let { error ->
                 item {
                     Banner(
-                        error,
+                        error.message(),
                         isError = true,
-                        actionLabel = "Erneut",
+                        actionLabel = stringResource(R.string.retry),
                         onAction = { container.refreshCards() },
                         modifier = Modifier.padding(16.dp),
                     )
@@ -232,7 +245,7 @@ fun DecksScreen(
                     ChipRow(
                         options = listOf<GameFormat?>(null, GameFormat.STANDARD, GameFormat.WILD, GameFormat.TWIST),
                         isSelected = { it == formatFilter },
-                        label = { it?.displayName ?: "Alle" },
+                        label = { it?.let { format -> context.getString(format.labelRes()) } ?: context.getString(R.string.all) },
                         onClick = { formatFilter = it },
                         modifier = Modifier.padding(top = 8.dp),
                     )
@@ -241,7 +254,7 @@ fun DecksScreen(
                     ChipRow(
                         options = DeckSort.entries.toList(),
                         isSelected = { it == sort },
-                        label = { "↕ ${it.label}" },
+                        label = { "↕ " + context.getString(it.label) },
                         onClick = { sort = it },
                         modifier = Modifier.padding(vertical = 4.dp),
                     )
@@ -251,16 +264,15 @@ fun DecksScreen(
                 item {
                     EmptyState(
                         icon = Icons.Filled.Style,
-                        title = "Noch keine Decks",
-                        message = "Importiere einen Deck-Code (z. B. von HSReplay, HearthPwn oder aus Hearthstone kopiert), " +
-                            "baue ein eigenes Deck oder übernimm ein Meta-Deck.",
+                        title = stringResource(R.string.no_decks_title),
+                        message = stringResource(R.string.no_decks_message),
                         actions = {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = {
                                     importInitialText = context.readClipboardText()?.takeIf { DeckTextParser.parseFirst(it) != null }.orEmpty()
                                     showImport = true
-                                }) { Text("Deck-Code importieren") }
-                                OutlinedButton(onClick = { navController.navigateTopLevel(Routes.META) }) { Text("Meta-Decks ansehen") }
+                                }) { Text(stringResource(R.string.import_deck_code)) }
+                                OutlinedButton(onClick = { navController.navigateTopLevel(Routes.META) }) { Text(stringResource(R.string.browse_meta_decks)) }
                             }
                         },
                     )
@@ -283,13 +295,13 @@ fun DecksScreen(
             onDismiss = { showImport = false },
             onImport = { text ->
                 scope.launch {
-                    val imported = container.decks.importFromText(text, container.cards.db)
+                    val imported = container.decks.importFromText(text, container.cards.db, defaultDeckName(context))
                     showImport = false
                     snackbar.showSnackbar(
                         when (imported.size) {
-                            0 -> "Kein gültiger Deck-Code gefunden."
-                            1 -> "„${imported.first().name}“ importiert."
-                            else -> "${imported.size} Decks importiert."
+                            0 -> context.getString(R.string.no_valid_deck_code)
+                            1 -> context.getString(R.string.deck_imported, imported.first().name)
+                            else -> context.resources.getQuantityString(R.plurals.decks_imported, imported.size, imported.size)
                         },
                     )
                 }
@@ -298,7 +310,7 @@ fun DecksScreen(
     }
     if (showClassPicker) {
         ClassPickerDialog(
-            title = "Klasse wählen",
+            title = stringResource(R.string.choose_class),
             onDismiss = { showClassPicker = false },
             onPick = { cls ->
                 showClassPicker = false
@@ -308,7 +320,6 @@ fun DecksScreen(
     }
 }
 
-/** Einstieg „Spielen & tracken“: Hearthstone starten, alles Weitere erkennt die App selbst. */
 @Composable
 private fun PlayCard(active: Boolean, status: String, onPlay: () -> Unit, modifier: Modifier = Modifier) {
     Card(
@@ -326,14 +337,13 @@ private fun PlayCard(active: Boolean, status: String, onPlay: () -> Unit, modifi
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (active) "Tracker aktiv" else "Spielen & automatisch tracken",
+                    stringResource(if (active) R.string.tracker_active else R.string.play_and_track),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Text(
-                    if (active) "$status – tippen, um Hearthstone zu öffnen"
-                    else "Startet Hearthstone. Spielstart, dein Deck und die Karten des Gegners werden erkannt.",
+                    if (active) stringResource(R.string.tracker_active_hint, status) else stringResource(R.string.play_and_track_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
@@ -371,7 +381,7 @@ private fun DeckListItem(row: DeckRow, collectionEmpty: Boolean, dust: Int, onCl
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ClassBadge(deck.heroClass)
                     Text(
-                        "${deck.format.displayName} · ${deck.cardCount} Karten",
+                        "${deck.format.label()} · " + pluralStringResource(R.plurals.card_count, deck.cardCount, deck.cardCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -396,11 +406,11 @@ fun ImportDeckDialog(initialText: String, onDismiss: () -> Unit, onImport: (Stri
     val found = remember(text) { DeckTextParser.parseAll(text) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Deck-Code importieren") },
+        title = { Text(stringResource(R.string.import_deck_code)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Füge einen oder mehrere Deck-Codes ein – z. B. aus Hearthstone („Deck kopieren“), HSReplay oder HearthPwn.",
+                    stringResource(R.string.import_deck_code_hint),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedTextField(
@@ -412,13 +422,13 @@ fun ImportDeckDialog(initialText: String, onDismiss: () -> Unit, onImport: (Stri
                 TextButton(onClick = { context.readClipboardText()?.let { text = it } }) {
                     Icon(Icons.Filled.ContentPaste, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Aus Zwischenablage einfügen")
+                    Text(stringResource(R.string.paste_from_clipboard))
                 }
                 Text(
-                    when (found.size) {
-                        0 -> if (text.isBlank()) "" else "Kein gültiger Deck-Code erkannt."
-                        1 -> "1 Deck erkannt" + (found.first().name?.let { ": $it" } ?: "")
-                        else -> "${found.size} Decks erkannt"
+                    when {
+                        found.isEmpty() -> if (text.isBlank()) "" else stringResource(R.string.no_valid_deck_code)
+                        found.size == 1 && found.first().name != null -> stringResource(R.string.one_deck_found_named, found.first().name!!)
+                        else -> pluralStringResource(R.plurals.decks_found, found.size, found.size)
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = if (found.isEmpty()) HsColors.Warning else HsColors.Win,
@@ -426,8 +436,8 @@ fun ImportDeckDialog(initialText: String, onDismiss: () -> Unit, onImport: (Stri
             }
         },
         confirmButton = {
-            Button(onClick = { onImport(text) }, enabled = found.isNotEmpty()) { Text("Importieren") }
+            Button(onClick = { onImport(text) }, enabled = found.isNotEmpty()) { Text(stringResource(R.string.import_action)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

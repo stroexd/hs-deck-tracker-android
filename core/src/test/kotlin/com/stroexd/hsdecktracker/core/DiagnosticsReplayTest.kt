@@ -10,15 +10,7 @@ import com.stroexd.hsdecktracker.core.vision.VisionGameTracker
 import java.io.File
 import kotlin.test.Test
 
-/**
- * Entwicklerwerkzeug: spielt eine Diagnose-Sitzung aus der App (`ocr.jsonl`) erneut durch die
- * Erkennung und schreibt die erkannten Ereignisse mit Kartennamen nach `build/replay.txt`.
- *
- * Läuft nur, wenn `HS_DIAG_DIR` (Sitzungsordner) und `HS_CARDS_DIR` (Ordner mit
- * `cards.deDE.json`/`cards.enUS.json` im HearthstoneJSON-Format) gesetzt sind.
- */
 class DiagnosticsReplayTest {
-
     @Test
     fun replayDiagnosticsSession() {
         val sessionDir = System.getenv("HS_DIAG_DIR")?.let(::File) ?: return
@@ -47,20 +39,21 @@ class DiagnosticsReplayTest {
             val events = vision.onFrame(frame)
             for (event in events) {
                 val text = when (event) {
-                    is GameEvent.FriendlyCardSeen -> "EIGENE  ${names(event.dbfIds)}"
-                    is GameEvent.FriendlyCardMulliganed -> "ZURÜCK  ${names(event.dbfIds)}"
-                    is GameEvent.OpponentCardSeen -> "GEGNER  ${names(event.dbfIds)}"
+                    is GameEvent.FriendlyCardSeen -> "OWN       ${names(event.dbfIds)}"
+                    is GameEvent.FriendlyCardMulliganed -> "RETURNED  ${names(event.dbfIds)}"
+                    is GameEvent.OpponentCardSeen -> "OPPONENT  ${names(event.dbfIds)}"
                     else -> event.toString()
                 }
                 out.append("#${i + 1} t=${(frame.timestamp - t0) / 1000}s  $text\n")
-                tracker.onGameEvent(event, db, recordResults = false)
+                if (event !is GameEvent.GameEnded) tracker.onGameEvent(event, db)
             }
         }
+        out.append("\nDetected client language: ${vision.gameLocale}")
         val state = tracker.state.value
         if (state != null) {
-            out.append("\nKlasse: ${state.playerClass} vs ${state.opponentClass}, Zug ${state.turn}, ging zuerst: ${state.wentFirst}\n")
-            out.append("Gegnerkarten: ${state.opponentCards.joinToString { db.byDbfId(it)?.name ?: "$it" }}\n")
-            out.append("Extra gezogen: ${state.extraDraws.joinToString { db.byCardId(it)?.name ?: it }}\n")
+            out.append("\nClasses: ${state.playerClass} vs ${state.opponentClass}, turn ${state.turn}, went first: ${state.wentFirst}\n")
+            out.append("Opponent cards: ${state.opponentCards.joinToString { db.byDbfId(it)?.name ?: "$it" }}\n")
+            out.append("Extra draws: ${state.extraDraws.joinToString { db.byCardId(it)?.name ?: it }}\n")
         }
         File("build/replay.txt").apply { parentFile.mkdirs() }.writeText(out.toString())
         println(out)

@@ -20,8 +20,8 @@ class StoreTest {
         val store = JsonFileStore(file, AppSettings.serializer(), AppSettings())
         assertEquals(AppSettings(), store.value)
         assertTrue(dir.listFiles()!!.any { it.name.startsWith("settings.json.corrupt") })
-        store.update { it.copy(cardLocale = "enUS") }
-        assertEquals("enUS", JsonFileStore(file, AppSettings.serializer(), AppSettings()).value.cardLocale)
+        store.update { it.copy(language = "enUS") }
+        assertEquals("enUS", JsonFileStore(file, AppSettings.serializer(), AppSettings()).value.language)
         dir.deleteRecursively()
     }
 
@@ -29,17 +29,17 @@ class StoreTest {
     fun unknownFieldsAndEnumsAreTolerated() {
         val dir = Files.createTempDirectory("hs-store").toFile()
         val file = File(dir, "settings.json").apply {
-            writeText("""{"cardLocale":"frFR","metaRankRange":"GIBT_ES_NICHT","neuesFeld":123}""")
+            writeText("""{"language":"frFR","metaRankRange":"DOES_NOT_EXIST","newField":123}""")
         }
         val value = JsonFileStore(file, AppSettings.serializer(), AppSettings()).value
-        assertEquals("frFR", value.cardLocale)
+        assertEquals("frFR", value.language)
         assertEquals(AppSettings().metaRankRange, value.metaRankRange)
         dir.deleteRecursively()
     }
 
     @Test
     fun setNamesAndDefaults() {
-        assertEquals("Kernset", CardSets.displayName("CORE"))
+        assertEquals("Core", CardSets.displayName("CORE"))
         assertEquals("Some New Set", CardSets.displayName("SOME_NEW_SET"))
         assertTrue(CardSets.isStandardByDefault("SOME_NEW_SET"))
         assertTrue(CardSets.isStandardByDefault("CORE"))

@@ -50,7 +50,6 @@ class MatchHistoryTest {
         assertEquals(listOf(LEEROY), turns[0].returned)
         assertEquals(listOf(EPIC_MAGE), turns[1].opponentPlayed)
         assertEquals(listOf("TOKEN_01"), turns[2].extraDrawn)
-        // Neues Spiel beginnt ohne Verlauf
         assertTrue(state.resetForNewGame(5).timeline.isEmpty())
     }
 
@@ -60,7 +59,6 @@ class MatchHistoryTest {
         val record = AppJson.decodeFromString(MatchRecord.serializer(), json)
         assertEquals(HsClass.ROGUE, record.opponentClass)
         assertTrue(record.timeline.isEmpty())
-        // Kompakte Schlüssel im Verlauf
         val encoded = AppJson.encodeToString(
             MatchRecord.serializer(),
             TrackerState.start(deck, 0).draw(FIREBALL).toMatchRecord(MatchResult.LOSS, 10),
@@ -87,30 +85,24 @@ class MatchHistoryTest {
         assertEquals(listOf("3"), MatchHistory.filter(matches, MatchQuery(format = GameFormat.WILD)).map { it.id })
         assertEquals(listOf("1"), MatchHistory.filter(matches, MatchQuery(text = "tempo"), db).map { it.id })
         assertEquals(listOf("1"), MatchHistory.filter(matches, MatchQuery(text = "leeroy"), db).map { it.id })
-        assertEquals(listOf("2"), MatchHistory.filter(matches, MatchQuery(text = "topdeck priester")).map { it.id })
+        val germanClass = { m: MatchRecord -> if (m.opponentClass == HsClass.PRIEST) "Priester" else "" }
+        assertEquals(listOf("2"), MatchHistory.filter(matches, MatchQuery(text = "topdeck priester"), labels = germanClass).map { it.id })
         assertEquals(listOf("3"), MatchHistory.filter(matches, MatchQuery(sinceMillis = 2 * day)).map { it.id })
     }
 
     @Test
-    fun groupingAndLabels() {
+    fun groupingByDay() {
         val days = MatchHistory.groupByDay(matches, ZoneOffset.UTC)
         assertEquals(listOf(LocalDate.of(1970, 1, 4), LocalDate.of(1970, 1, 2)), days.map { it.date })
         assertEquals(listOf("2", "1"), days[1].matches.map { it.id })
         assertEquals("1–1", days[1].winRate.label)
-        val today = LocalDate.of(2026, 9, 24)
-        assertEquals("Heute", MatchHistory.dayLabel(today, today))
-        assertEquals("Gestern", MatchHistory.dayLabel(today.minusDays(1), today))
-        assertEquals("Montag, 21. September 2026", MatchHistory.dayLabel(today.minusDays(3), today))
     }
 
     @Test
-    fun csvAndSummary() {
+    fun csvExport() {
         val csv = MatchExporter.toCsv(matches, db, ZoneOffset.UTC).lines()
-        assertTrue(csv[0].startsWith("Datum;Ergebnis;Deck"))
-        assertEquals("1970-01-02 00:00;Sieg;Feuer-Magier;Magier;Schurke;Tempo Schurke;Standard;;;;Manuell;Leeroy Jenkins;", csv[1])
+        assertTrue(csv[0].startsWith("date;result;deck"))
+        assertEquals("1970-01-02 00:00;win;Feuer-Magier;mage;rogue;Tempo Schurke;standard;;;;manual;Leeroy Jenkins;", csv[1])
         assertTrue(csv[2].endsWith(";\"knapp; Topdeck\""))
-        val summary = MatchExporter.summaryText(matches[0], db, ZoneId.of("UTC"))
-        assertTrue(summary.startsWith("Sieg: Feuer-Magier vs. Tempo Schurke"))
-        assertTrue(summary.contains("Gegner spielte: Leeroy Jenkins"))
     }
 }

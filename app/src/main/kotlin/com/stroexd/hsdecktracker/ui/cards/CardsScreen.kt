@@ -47,7 +47,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -64,6 +68,8 @@ import com.stroexd.hsdecktracker.core.cards.Ownership
 import com.stroexd.hsdecktracker.core.cards.Rarity
 import com.stroexd.hsdecktracker.core.collection.CraftingCalculator
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.label
+import com.stroexd.hsdecktracker.ui.labelRes
 import com.stroexd.hsdecktracker.ui.components.CardImage
 import com.stroexd.hsdecktracker.ui.components.ChipRow
 import com.stroexd.hsdecktracker.ui.components.CollectionCardDialog
@@ -85,6 +91,7 @@ class CardsViewModel : ViewModel() {
 @Composable
 fun CardsScreen(navController: NavHostController) {
     val container = LocalAppContainer.current
+    val context = LocalContext.current
     val vm: CardsViewModel = viewModel()
     val filter by vm.filter.collectAsStateWithLifecycle()
     val cardState by container.cards.state.collectAsStateWithLifecycle()
@@ -102,11 +109,11 @@ fun CardsScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Karten") },
+                title = { Text(stringResource(R.string.tab_cards)) },
                 actions = {
                     IconButton(onClick = { showFilters = true }) {
                         BadgedBox(badge = { if (advancedCount > 0) Badge { Text("$advancedCount") } }) {
-                            Icon(Icons.Filled.FilterList, contentDescription = "Filter")
+                            Icon(Icons.Filled.FilterList, contentDescription = stringResource(R.string.filter))
                         }
                     }
                 },
@@ -118,19 +125,19 @@ fun CardsScreen(navController: NavHostController) {
                 value = filter.query,
                 onValueChange = { q -> vm.update { it.copy(query = q) } },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                placeholder = "Name, Text, Stamm, Schlüsselwort …",
+                placeholder = stringResource(R.string.card_search_full_placeholder),
             )
             ChipRow(
                 options = listOf(GameFormat.STANDARD, GameFormat.WILD, GameFormat.CLASSIC),
                 isSelected = { it == filter.format },
-                label = { it.displayName },
+                label = { context.getString(it.labelRes()) },
                 onClick = { f -> vm.update { it.copy(format = if (it.format == f) null else f) } },
                 modifier = Modifier.padding(top = 4.dp),
             )
             ChipRow(
                 options = HsClass.playable + HsClass.NEUTRAL,
                 isSelected = { it in filter.classes },
-                label = { it.displayName },
+                label = { context.getString(it.labelRes()) },
                 onClick = { cls -> vm.update { it.copy(classes = if (cls in it.classes) it.classes - cls else it.classes + cls) } },
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -142,13 +149,13 @@ fun CardsScreen(navController: NavHostController) {
                 modifier = Modifier.padding(vertical = 4.dp),
             )
             Text(
-                "${results.size} Karten",
+                pluralStringResource(R.plurals.card_count, results.size, results.size),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             if (results.isEmpty() && !cardState.db.isEmpty) {
-                EmptyState(Icons.Filled.SearchOff, "Keine Treffer", "Passe Suche oder Filter an.")
+                EmptyState(Icons.Filled.SearchOff, stringResource(R.string.no_results), stringResource(R.string.no_results_hint))
             }
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 110.dp),
@@ -159,7 +166,7 @@ fun CardsScreen(navController: NavHostController) {
             ) {
                 items(results, key = { it.dbfId }) { card ->
                     val owned = if (collection.isEmpty) null else CraftingCalculator.ownedCopies(card, collection, settings.collectionOptions)
-                    CardGridItem(card, settings.cardLocale, owned) { selected = card }
+                    CardGridItem(card, cardState.db.locale, owned) { selected = card }
                 }
             }
         }
@@ -222,44 +229,44 @@ private fun CardFilterSheet(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Filter", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            TextButton(onClick = { onChange { CardFilter(query = it.query, format = it.format) } }) { Text("Zurücksetzen") }
+            Text(stringResource(R.string.filter), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            TextButton(onClick = { onChange { CardFilter(query = it.query, format = it.format) } }) { Text(stringResource(R.string.reset)) }
         }
-        Text("Seltenheit", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.rarity), style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             (listOf(Rarity.FREE) + Rarity.collectible).forEach { rarity ->
                 FilterChip(
                     selected = rarity in filter.rarities,
                     onClick = { onChange { it.copy(rarities = if (rarity in it.rarities) it.rarities - rarity else it.rarities + rarity) } },
-                    label = { Text(rarity.displayName, color = if (rarity in filter.rarities) MaterialTheme.colorScheme.onSurface else rarity.uiColor) },
+                    label = { Text(rarity.label(), color = if (rarity in filter.rarities) MaterialTheme.colorScheme.onSurface else rarity.uiColor) },
                 )
             }
         }
-        Text("Kartentyp", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.card_type), style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CardType.deckTypes.forEach { type ->
                 FilterChip(
                     selected = type in filter.types,
                     onClick = { onChange { it.copy(types = if (type in it.types) it.types - type else it.types + type) } },
-                    label = { Text(type.displayName) },
+                    label = { Text(type.label()) },
                 )
             }
         }
         if (collectionAvailable) {
-            Text("Sammlung", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.tab_collection), style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Ownership.entries.forEach { ownership ->
                     FilterChip(
                         selected = filter.ownership == ownership,
                         onClick = { onChange { it.copy(ownership = ownership) } },
-                        label = { Text(ownership.displayName) },
+                        label = { Text(stringResource(ownership.labelRes())) },
                     )
                 }
             }
         }
-        Text("Set", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.card_set), style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(selected = filter.set == null, onClick = { onChange { it.copy(set = null) } }, label = { Text("Alle Sets") })
+            FilterChip(selected = filter.set == null, onClick = { onChange { it.copy(set = null) } }, label = { Text(stringResource(R.string.all_sets)) })
             sets.forEach { set ->
                 FilterChip(
                     selected = filter.set == set,

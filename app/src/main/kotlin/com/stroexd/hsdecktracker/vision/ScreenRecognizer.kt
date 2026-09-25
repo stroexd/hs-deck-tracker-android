@@ -29,30 +29,8 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Takt der Bildschirmauswertung.
- * @param intervalMillis Abstand zwischen zwei Bildschirmfotos.
- * @param maxReuseMillis so lange darf ein unverändertes Bild das letzte Texterkennungs-Ergebnis wiederverwenden.
- */
 data class CapturePacing(val intervalMillis: Long, val maxReuseMillis: Long)
 
-/**
- * Nimmt den Bildschirm per MediaProjection auf und erkennt Texte mit ML Kit (on-device) – nur im
- * Querformat (Hearthstone) und bei eingeschaltetem Bildschirm.
- *
- * Sparsam mit dem Akku:
- * - Das virtuelle Display ist zwischen zwei Fotos abgekoppelt (wie ein ausgeschalteter Bildschirm),
- *   statt 60–120 Bilder pro Sekunde zu rendern, von denen nur wenige gebraucht werden.
- * - Der Takt kommt von außen ([pacing]) – außerhalb einer Partie deutlich seltener; im Stromsparmodus
- *   bzw. bei hoher Gerätetemperatur zusätzlich langsamer.
- * - Hat sich das Bild kaum verändert (grober Helligkeitsabdruck), wird die teure Texterkennung
- *   übersprungen und das letzte Ergebnis wiederverwendet.
- * - Eine einzige Bitmap wird wiederverwendet statt pro Bild neu angelegt.
- *
- * @param maskProvider Bereich des eigenen Overlays in Bildschirmkoordinaten, der ignoriert wird.
- * @param onFrame wird immer auf demselben Hintergrund-Thread aufgerufen; die Bitmap ist nur während des
- *   Aufrufs gültig. `reused` = Ergebnis ohne neue Texterkennung (Bild unverändert).
- */
 class ScreenRecognizer(
     private val context: Context,
     private val projection: MediaProjection,
@@ -65,7 +43,6 @@ class ScreenRecognizer(
     private val handler = Handler(thread.looper)
     private val worker = Executors.newSingleThreadExecutor()
 
-    // Nach stop() eintreffende Ergebnisse werden verworfen statt abgelehnt.
     private val listenerExecutor = Executor { command -> runCatching { worker.execute(command) } }
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val powerManager = context.getSystemService(PowerManager::class.java)
@@ -73,7 +50,6 @@ class ScreenRecognizer(
     private var reader: ImageReader? = null
     private var virtualDisplay: VirtualDisplay? = null
 
-    // Nur auf dem Aufnahme-Thread verwendet
     private var awaitingFrame = false
     private var captureStartedAt = 0L
     private var detachBetweenFrames = true
@@ -98,7 +74,6 @@ class ScreenRecognizer(
             handler,
         )
         val (realWidth, realHeight) = realDisplaySize()
-        // Hearthstone läuft im Querformat → virtuelles Display im Querformat anlegen.
         val landscapeWidth = max(realWidth, realHeight)
         val landscapeHeight = min(realWidth, realHeight)
         val scale = min(1f, MAX_WIDTH.toFloat() / landscapeWidth)
@@ -107,7 +82,6 @@ class ScreenRecognizer(
         val imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         imageReader.setOnImageAvailableListener({ onImageAvailable(it) }, handler)
         reader = imageReader
-        // Das erste Bild wird sofort ausgewertet, danach bestimmt der Takt die Aufnahmen.
         awaitingFrame = true
         captureStartedAt = SystemClock.elapsedRealtime()
         virtualDisplay = projection.createVirtualDisplay(
@@ -145,8 +119,6 @@ class ScreenRecognizer(
         }
     }
 
-    // ------------------------------------------------------------------ Takt
-
     private fun scheduleNext() {
         if (stopped.get()) return
         val interval = effectiveInterval(pacing().intervalMillis)
@@ -155,7 +127,6 @@ class ScreenRecognizer(
         handler.postDelayed(captureTask, wait)
     }
 
-    /** Stromsparmodus bzw. hohe Temperatur → seltener auswerten. */
     private fun effectiveInterval(base: Long): Long {
         var factor = 1.0
         if (powerManager?.isPowerSaveMode == true) factor *= 1.5
@@ -167,7 +138,6 @@ class ScreenRecognizer(
         if (stopped.get()) return
         captureStartedAt = SystemClock.elapsedRealtime()
         val (realWidth, realHeight) = realDisplaySize()
-        // Bildschirm aus oder Hochformat (nicht Hearthstone): nichts aufnehmen, später erneut prüfen
         if (powerManager?.isInteractive == false || realWidth < realHeight) {
             handler.postDelayed(captureTask, INACTIVE_CHECK_MS)
             return
@@ -175,34 +145,25 @@ class ScreenRecognizer(
         awaitingFrame = true
         if (detachBetweenFrames) {
             val imageReader = reader ?: return
-            // Veraltetes Bild verwerfen, dann Display wieder ankoppeln → liefert ein frisches Bild
             runCatching { imageReader.acquireLatestImage()?.close() }
             virtualDisplay?.surface = imageReader.surface
             reattached = true
             handler.postDelayed(frameTimeout, FRAME_TIMEOUT_MS)
         }
-        // Ohne Abkoppeln kommt das nächste Bild ohnehin von selbst.
     }
 
-    /**
-     * Kein Bild nach dem Ankoppeln. Bei unverändertem Bildschirm kann das vorkommen – dann gibt es auch
-     * nichts Neues zu erkennen. Kam nach dem Ankoppeln aber noch nie ein Bild, unterstützt das Gerät das
-     * Abkoppeln nicht: Dann bleibt das Display dauerhaft angekoppelt (sicherer Rückfall).
-     */
     private fun onFrameTimeout() {
         if (!awaitingFrame || stopped.get()) return
         timeouts++
         if (!reattachWorks && timeouts >= MAX_TIMEOUTS) {
             detachBetweenFrames = false
             virtualDisplay?.surface = reader?.surface
-            return // bleibt angekoppelt und wartet auf das nächste Bild
+            return
         }
         awaitingFrame = false
         virtualDisplay?.surface = null
         scheduleNext()
     }
-
-    // ------------------------------------------------------------------ Auswertung
 
     private fun onImageAvailable(imageReader: ImageReader) {
         val image = try {
@@ -252,7 +213,6 @@ class ScreenRecognizer(
         }
         val aspect = width.toFloat() / height
         if (reusable && previousLines != null) {
-            // Bild unverändert → letztes Ergebnis mit neuem Zeitstempel, ohne Texterkennung
             val frame = OcrFrame(System.currentTimeMillis(), previousLines, aspect)
             listenerExecutor.execute {
                 runCatching { onFrame(frame, target, true) }
@@ -263,7 +223,6 @@ class ScreenRecognizer(
         recognizer.process(InputImage.fromBitmap(target, 0))
             .addOnSuccessListener(listenerExecutor) { text ->
                 val frame = toFrame(text, width, height, aspect, mask)
-                // Auswertungsfehler dürfen die Aufnahme nicht beenden.
                 runCatching { onFrame(frame, target, false) }
                 handler.post {
                     lastLines = frame.lines
@@ -277,10 +236,6 @@ class ScreenRecognizer(
             }
     }
 
-    /**
-     * Grober Helligkeitsabdruck (Raster aus Zellen, je 4 Stichproben). Zellen im Overlay-Bereich
-     * werden ausgelassen, damit sich ändernde Overlay-Inhalte keine Texterkennung auslösen.
-     */
     private fun fingerprint(image: Image, mask: Rect?): IntArray {
         val plane = image.planes[0]
         val buffer = plane.buffer
@@ -314,7 +269,6 @@ class ScreenRecognizer(
         return result
     }
 
-    /** Nur wenige Zellen verändert (z. B. flackerndes Feuer am Spielfeldrand) → gleiches Bild. */
     private fun isSimilar(a: IntArray, b: IntArray): Boolean {
         if (a.size != b.size) return false
         var changed = 0
@@ -325,7 +279,6 @@ class ScreenRecognizer(
         return true
     }
 
-    /** Kopiert das Bild in die wiederverwendete Bitmap (inkl. Zeilenpolster rechts). */
     private fun copyToBitmap(image: Image): Bitmap {
         val plane = image.planes[0]
         val bitmapWidth = plane.rowStride / plane.pixelStride
@@ -370,7 +323,6 @@ class ScreenRecognizer(
         for (block in text.textBlocks) {
             for (line in block.lines) {
                 val box = line.boundingBox ?: continue
-                // Zeilenpolster rechts neben dem eigentlichen Bild enthält keine Inhalte
                 if (box.left >= width) continue
                 if (mask != null && Rect.intersects(mask, box)) continue
                 lines += OcrLine(line.text, box.left / w, box.top / h, min(box.right.toFloat(), w) / w, box.bottom / h)

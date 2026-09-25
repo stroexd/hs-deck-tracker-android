@@ -3,10 +3,6 @@ package com.stroexd.hsdecktracker.core.cards
 import com.stroexd.hsdecktracker.core.util.normalizeForSearch
 import kotlinx.serialization.Serializable
 
-/**
- * Eine Karte im Format von HearthstoneJSON (api.hearthstonejson.com).
- * Unbekannte Felder werden beim Parsen ignoriert.
- */
 @Serializable
 data class Card(
     val dbfId: Int,
@@ -37,7 +33,6 @@ data class Card(
     val rarityType: Rarity get() = Rarity.fromString(rarity)
     val cardType: CardType get() = CardType.fromString(type)
 
-    /** Alle Klassen, in deren Decks die Karte gespielt werden darf (Mehrklassenkarten). */
     val allowedClasses: Set<HsClass>
         get() = if (classes.isNotEmpty()) classes.map { HsClass.fromString(it) }.toSet() else setOf(hsClass)
 
@@ -48,7 +43,6 @@ data class Card(
 
     val maxCopies: Int get() = rarityType.maxCopies
 
-    /** Karten, die man in ein Deck packen kann (keine Heldenskins, Heldenfähigkeiten, Modus-Karten). */
     val isDeckCard: Boolean
         get() = collectible &&
             cardType in CardType.deckTypes &&
@@ -56,7 +50,6 @@ data class Card(
             !set.startsWith("BATTLEGROUNDS") &&
             !set.startsWith("LETTUCE")
 
-    /** Herstellbar mit Arkanstaub. Kernset-/Basiskarten und Belohnungskarten sind es nicht. */
     val isCraftable: Boolean
         get() = rarityType in Rarity.collectible && set !in CardSets.freeSets && howToEarn == null
 
@@ -64,12 +57,10 @@ data class Card(
 
     val tribes: List<String> get() = races.ifEmpty { listOfNotNull(race) }
 
-    /** Kartentext ohne Hearthstone-Markup. */
     val plainText: String get() = cleanCardText(text)
 
     val plainFlavor: String get() = cleanCardText(flavor)
 
-    /** Normalisierter Suchtext (Name, Text, Stämme, Mechaniken) – einmalig berechnet. */
     val searchText: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
         buildString {
             append(normalizeForSearch(name)).append(' ')

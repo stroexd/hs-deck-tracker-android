@@ -5,11 +5,9 @@ import kotlinx.serialization.Serializable
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 
-/** Karte im Sideboard (z. B. E.T.C., Bandmanager oder Zilliax-Module). */
 @Serializable
 data class SideboardCard(val dbfId: Int, val count: Int, val ownerDbfId: Int)
 
-/** Inhalt eines Hearthstone-Deck-Codes. `cards` bildet dbfId → Anzahl ab. */
 data class DeckDefinition(
     val heroes: List<Int>,
     val format: GameFormat,
@@ -21,27 +19,23 @@ data class DeckDefinition(
 
 class InvalidDeckCodeException(message: String, cause: Throwable? = null) : IllegalArgumentException(message, cause)
 
-/**
- * Kodiert/dekodiert das Deckstring-Format (Version 1) von Hearthstone:
- * Base64 aus Varints – Header, Format, Helden, Karten x1/x2/xn und optional Sideboards.
- */
 object DeckCode {
     private const val VERSION = 1
 
     fun decode(code: String): DeckDefinition {
         val cleaned = code.filterNot { it.isWhitespace() }
-        if (cleaned.isEmpty()) throw InvalidDeckCodeException("Leerer Deck-Code")
+        if (cleaned.isEmpty()) throw InvalidDeckCodeException("Empty deck code")
         val padded = cleaned.trimEnd('=').let { it + "=".repeat((4 - it.length % 4) % 4) }
         val bytes = try {
             Base64.getDecoder().decode(padded)
         } catch (e: IllegalArgumentException) {
-            throw InvalidDeckCodeException("Kein gültiges Base64", e)
+            throw InvalidDeckCodeException("Invalid base64", e)
         }
         val reader = VarIntReader(bytes)
         try {
-            if (reader.readByte() != 0) throw InvalidDeckCodeException("Ungültiger Header")
+            if (reader.readByte() != 0) throw InvalidDeckCodeException("Invalid header")
             val version = reader.readVarInt()
-            if (version != VERSION) throw InvalidDeckCodeException("Nicht unterstützte Version $version")
+            if (version != VERSION) throw InvalidDeckCodeException("Unsupported version $version")
             val format = GameFormat.fromId(reader.readVarInt())
             val heroes = List(reader.readVarInt()) { reader.readVarInt() }
             val cards = linkedMapOf<Int, Int>()
@@ -61,10 +55,10 @@ object DeckCode {
                     sideboards += SideboardCard(id, count, reader.readVarInt())
                 }
             }
-            if (heroes.isEmpty()) throw InvalidDeckCodeException("Kein Held im Deck-Code")
+            if (heroes.isEmpty()) throw InvalidDeckCodeException("No hero in deck code")
             return DeckDefinition(heroes, format, cards, sideboards)
         } catch (e: IndexOutOfBoundsException) {
-            throw InvalidDeckCodeException("Deck-Code ist unvollständig", e)
+            throw InvalidDeckCodeException("Truncated deck code", e)
         }
     }
 
@@ -120,7 +114,7 @@ object DeckCode {
                 result = result or ((b and 0x7F) shl shift)
                 if (b and 0x80 == 0) return result
                 shift += 7
-                if (shift > 28) throw InvalidDeckCodeException("Varint zu lang")
+                if (shift > 28) throw InvalidDeckCodeException("Varint too long")
             }
         }
     }
