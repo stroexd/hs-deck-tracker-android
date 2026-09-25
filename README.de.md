@@ -4,6 +4,7 @@
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 [English](README.md) · **Deutsch**
 
@@ -119,6 +120,10 @@ Sitzung auf (erkannter Text je Bild); diese lässt sich am Rechner erneut abspie
 ```bash
 HS_DIAG_DIR=<Sitzungsordner> HS_CARDS_DIR=<Ordner mit cards.enUS.json / cards.deDE.json> ./gradlew :core:test --tests '*DiagnosticsReplay*'
 ```
+
+## Lizenz
+
+HS Deck Tracker ist freie Software unter der [GNU General Public License v3.0](LICENSE).
 
 ## Quellen & Hinweis
 
