@@ -28,8 +28,13 @@ class TrackerController(private val clock: () -> Long = System::currentTimeMilli
     /** dbfIds, die für Gegnerkarten bevorzugt werden (z. B. Karten aus Meta-Decks). */
     var preferredOpponentIds: () -> Set<Int> = { emptySet() }
 
-    /** Von der Bilderkennung gesehene eigene Karten dieser Partie: Zug → mögliche dbfIds. */
-    private val visionSeen = mutableListOf<Pair<Int, List<Int>>>()
+    /** Von der Bilderkennung gesehene eigene Karten dieser Partie (für Deck-Erkennung und Nachspielen). */
+    private class VisionCard(val turn: Int, val candidates: List<Int>, val returned: Boolean)
+
+    private val visionSeen = mutableListOf<VisionCard>()
+
+    /** Eigene Klasse laut Bilderkennung (Namensschild) – schränkt die Deck-Erkennung ein. */
+    private var detectedPlayerClass: HsClass? = null
 
     fun start(deck: Deck) {
         selectedDeck = deck
@@ -64,6 +69,7 @@ class TrackerController(private val clock: () -> Long = System::currentTimeMilli
             GameEvent.GameStarted -> {
                 val now = clock()
                 visionSeen.clear()
+                detectedPlayerClass = null
                 // Ohne fest gewähltes Deck wird das Deck jede Partie neu erkannt.
                 val base = selectedDeck?.let { TrackerState.start(it, now) } ?: TrackerState.empty(now)
                 _state.value = base.copy(autoTracked = true)
@@ -99,15 +105,44 @@ class TrackerController(private val clock: () -> Long = System::currentTimeMilli
                 if (!recordResults) return null
                 return finishGame(result)
             }
-            is GameEvent.FriendlyCardSeen -> onFriendlyCardSeen(event.dbfIds, db)
+            is GameEvent.FriendlyCardSeen -> onFriendlyCardSeen(event.dbfIds, event.fromDeck, db)
+            is GameEvent.FriendlyCardMulliganed -> onFriendlyCardMulliganed(event.dbfIds, db)
+            is GameEvent.ClassDetected -> {
+                if (!event.hsClass.isPlayable) return null
+                if (event.friendly) {
+                    detectedPlayerClass = event.hsClass
+                    val current = _state.value ?: return null
+                    if (current.deckCards.isNotEmpty() && current.playerClass.isPlayable && current.playerClass != event.hsClass) {
+                        // Das zuletzt benutzte Deck gehört zu einer anderen Klasse → neu erkennen
+                        selectedDeck = null
+                        _state.value = TrackerState.empty(current.startedAt).copy(
+                            autoTracked = current.autoTracked,
+                            playerClass = event.hsClass,
+                            opponentClass = current.opponentClass,
+                            wentFirst = current.wentFirst,
+                        )
+                    } else if (current.deckCards.isEmpty() || current.playerClass == HsClass.UNKNOWN) {
+                        _state.value = current.copy(playerClass = event.hsClass)
+                    }
+                } else {
+                    update { it.withOpponentClass(event.hsClass) }
+                }
+            }
             is GameEvent.OpponentCardSeen -> {
                 if (event.dbfIds.isEmpty()) return null
+                val current = _state.value ?: return null
+                // Bekannte Gegnerklasse: nur Karten, die diese Klasse spielen darf (filtert Fehlerkennungen)
+                val allowed = if (current.opponentClass.isPlayable) {
+                    event.dbfIds.filter { id -> db.byDbfId(id)?.isAllowedIn(current.opponentClass) ?: true }
+                } else {
+                    event.dbfIds
+                }
+                if (allowed.isEmpty()) return null
                 val preferred = preferredOpponentIds()
-                val id = event.dbfIds.firstOrNull { it in preferred } ?: event.dbfIds.first()
+                val id = allowed.firstOrNull { it in preferred } ?: allowed.first()
                 update { state ->
                     val updated = state.addOpponentCard(id)
-                    val cls = db.byDbfId(id)?.hsClass
-                    if (state.opponentClass == HsClass.UNKNOWN && cls != null && cls.isPlayable) updated.withOpponentClass(cls) else updated
+                    if (state.opponentClass == HsClass.UNKNOWN) updated.withOpponentClass(inferOpponentClass(updated, db)) else updated
                 }
             }
         }
@@ -115,52 +150,91 @@ class TrackerController(private val clock: () -> Long = System::currentTimeMilli
     }
 
     /**
+     * Gegnerklasse aus gespielten Karten (nur falls das Namensschild nicht gelesen wurde):
+     * Die häufigste Klasse, sobald mindestens zwei Karten dazu passen.
+     */
+    private fun inferOpponentClass(state: TrackerState, db: CardDatabase): HsClass =
+        state.opponentCards
+            .mapNotNull { id -> db.byDbfId(id)?.hsClass?.takeIf { it.isPlayable } }
+            .groupingBy { it }
+            .eachCount()
+            .filterValues { it >= 2 }
+            .maxByOrNull { it.value }
+            ?.key ?: HsClass.UNKNOWN
+
+    /**
      * Eigene Karte aus der Bilderkennung: dem Deck zuordnen oder – solange das Deck unbekannt ist –
      * das Deck anhand aller bisher gesehenen Karten erkennen (eigene Decks, dann Meta-Decks).
      */
-    private fun onFriendlyCardSeen(candidates: List<Int>, db: CardDatabase) {
+    private fun onFriendlyCardSeen(candidates: List<Int>, fromDeck: Boolean, db: CardDatabase) {
         val current = _state.value ?: return
         if (candidates.isEmpty()) return
-        visionSeen += current.turn to candidates
-        val seen = visionSeen.map { it.second }
+        if (!fromDeck) {
+            update { it.addExtraDraw(db.byDbfId(candidates.first())?.id ?: candidates.first().toString()) }
+            return
+        }
+        visionSeen += VisionCard(current.turn, candidates, returned = false)
+        if (identifyDeck(current, db)) return
+        update { state -> drawSeen(state, candidates, db) }
+    }
+
+    /** Beim Mulligan ausgetauschte Karte: zurück ins Deck. */
+    private fun onFriendlyCardMulliganed(candidates: List<Int>, db: CardDatabase) {
+        val current = _state.value ?: return
+        if (candidates.isEmpty()) return
+        visionSeen += VisionCard(current.turn, candidates, returned = true)
+        if (identifyDeck(current, db)) return
+        update { state -> returnSeen(state, candidates, db) }
+    }
+
+    /** Erkennt das Deck neu, falls noch keins bekannt ist oder das gewählte offensichtlich nicht passt. */
+    private fun identifyDeck(current: TrackerState, db: CardDatabase): Boolean {
+        val seen = visionSeen.map { it.candidates }
         val deckKnown = current.deckCards.isNotEmpty()
-        // Passt das (evtl. vorher gewählte) Deck offensichtlich nicht, wird neu erkannt.
         val mismatch = deckKnown && seen.size >= 3 &&
             DeckIdentifier.score(Deck(name = "", heroClass = current.playerClass, cards = current.deckCards), seen).matched * 2 < seen.size
-        if (!deckKnown || mismatch) {
-            val identified = DeckIdentifier.identify(seen, deckCandidates())
-            if (identified != null && identified.cards != current.deckCards) {
-                if (mismatch) selectedDeck = null
-                _state.value = rebuildWithDeck(current, identified, db)
-                return
-            }
-        }
-        update { state ->
-            val id = candidates.firstOrNull { state.remainingOf(it) > 0 }
-            if (id != null) {
-                state.draw(id)
-            } else {
-                val card = db.byDbfId(candidates.first())
-                val withExtra = state.addExtraDraw(card?.id ?: candidates.first().toString())
-                val cls = card?.hsClass
-                if (state.playerClass == HsClass.UNKNOWN && cls != null && cls.isPlayable) withExtra.copy(playerClass = cls) else withExtra
-            }
-        }
+        if (deckKnown && !mismatch) return false
+        val cls = detectedPlayerClass
+        val candidates = deckCandidates().filter { cls == null || it.heroClass == cls }
+        val identified = DeckIdentifier.identify(seen, candidates) ?: return false
+        if (identified.cards == current.deckCards) return false
+        if (mismatch) selectedDeck = null
+        _state.value = rebuildWithDeck(current, identified, db)
+        return true
+    }
+
+    private fun drawSeen(state: TrackerState, candidates: List<Int>, db: CardDatabase): TrackerState {
+        val id = candidates.firstOrNull { state.remainingOf(it) > 0 }
+        if (id != null) return state.draw(id)
+        val card = db.byDbfId(candidates.first())
+        val withExtra = state.addExtraDraw(card?.id ?: candidates.first().toString())
+        val cls = card?.hsClass
+        return if (state.playerClass == HsClass.UNKNOWN && cls != null && cls.isPlayable) withExtra.copy(playerClass = cls) else withExtra
+    }
+
+    private fun returnSeen(state: TrackerState, candidates: List<Int>, db: CardDatabase): TrackerState {
+        val id = candidates.firstOrNull { state.remainingOf(it) < (state.deckCards[it] ?: 0) }
+        if (id != null) return state.returnToDeck(id)
+        // Deck unbekannt: die zuvor als Zusatzkarte notierte Karte wieder entfernen
+        val cardIds = candidates.mapNotNull { db.byDbfId(it)?.id } + candidates.map { it.toString() }
+        return state.removeLastExtraDraw(cardIds)
     }
 
     /** Setzt das erkannte Deck für die laufende Partie und spielt die bisher gesehenen Karten nach. */
     private fun rebuildWithDeck(current: TrackerState, deck: Deck, db: CardDatabase): TrackerState {
+        val seenCardIds = visionSeen.flatMap { seen -> seen.candidates.mapNotNull { db.byDbfId(it)?.id } + seen.candidates.map { it.toString() } }.toSet()
         var state = TrackerState.start(deck, current.startedAt).copy(
             autoTracked = current.autoTracked,
             opponentClass = current.opponentClass,
             opponentCards = current.opponentCards,
             wentFirst = current.wentFirst,
+            // Zusatzkarten, die nicht aus dem Deck stammen (z. B. entdeckt), bleiben erhalten
+            extraDraws = current.extraDraws.filter { it !in seenCardIds },
             timeline = current.timeline.filter { it.type == TimelineType.OPPONENT_PLAY },
         )
-        for ((turn, candidates) in visionSeen) {
-            state = state.copy(turn = turn)
-            val id = candidates.firstOrNull { state.remainingOf(it) > 0 }
-            state = if (id != null) state.draw(id) else state.addExtraDraw(db.byDbfId(candidates.first())?.id ?: candidates.first().toString())
+        for (seen in visionSeen) {
+            state = state.copy(turn = seen.turn)
+            state = if (seen.returned) returnSeen(state, seen.candidates, db) else drawSeen(state, seen.candidates, db)
         }
         return state.copy(turn = current.turn)
     }

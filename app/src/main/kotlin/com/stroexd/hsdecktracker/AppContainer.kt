@@ -150,10 +150,14 @@ class AppContainer(context: Context) {
         _recognition.update { it.copy(active = false, phase = VisionGameTracker.Phase.IDLE) }
     }
 
-    /** Wertet ein erkanntes Bildschirmfoto aus (Aufruf immer vom selben Hintergrund-Thread). */
-    fun onScreenFrame(frame: OcrFrame): List<GameEvent> {
+    /**
+     * Wertet ein erkanntes Bildschirmfoto aus (Aufruf immer vom selben Hintergrund-Thread).
+     * @param notes nimmt für den Diagnose-Modus die Begründungen der Erkennung auf.
+     */
+    fun onScreenFrame(frame: OcrFrame, notes: MutableList<String>? = null): List<GameEvent> {
         val index = currentNameIndex() ?: return emptyList()
         val vision = visionTracker ?: VisionGameTracker(index, contextProvider = ::recognitionContext).also { visionTracker = it }
+        vision.decisionLog = notes?.let { list -> { note: String -> list += note } }
         val events = vision.onFrame(frame)
         events.forEach { onGameEvent(it) }
         _recognition.update {

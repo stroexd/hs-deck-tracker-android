@@ -165,8 +165,9 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             projection = projection,
             maskProvider = { overlayBounds },
             onFrame = { frame, bitmap ->
-                val events = container.onScreenFrame(frame)
-                diagnostics?.let { runCatching { it.record(frame, events, bitmap) } }
+                val notes = diagnostics?.let { mutableListOf<String>() }
+                val events = container.onScreenFrame(frame, notes)
+                diagnostics?.let { runCatching { it.record(frame, events, notes.orEmpty(), bitmap) } }
             },
             onStopped = {
                 container.onRecognitionStopped()

@@ -84,6 +84,17 @@ data class TrackerState(
     fun addExtraDraw(cardId: String): TrackerState =
         copy(extraDraws = extraDraws + cardId, timeline = timeline + event(TimelineType.EXTRA_DRAW, cardId = cardId))
 
+    /** Entfernt die zuletzt notierte Zusatzkarte mit einer der Karten-IDs (z. B. beim Mulligan zurückgelegt). */
+    fun removeLastExtraDraw(cardIds: Collection<String>): TrackerState {
+        val index = extraDraws.indexOfLast { it in cardIds }
+        if (index < 0) return this
+        val timelineIndex = timeline.indexOfLast { it.type == TimelineType.EXTRA_DRAW && it.cardId == extraDraws[index] }
+        return copy(
+            extraDraws = extraDraws.toMutableList().apply { removeAt(index) },
+            timeline = if (timelineIndex >= 0) timeline.toMutableList().apply { removeAt(timelineIndex) } else timeline,
+        )
+    }
+
     fun addOpponentCard(dbfId: Int): TrackerState =
         copy(opponentCards = opponentCards + dbfId, timeline = timeline + event(TimelineType.OPPONENT_PLAY, dbfId))
 

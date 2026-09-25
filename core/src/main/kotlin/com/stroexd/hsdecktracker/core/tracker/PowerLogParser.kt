@@ -1,6 +1,7 @@
 package com.stroexd.hsdecktracker.core.tracker
 
 import com.stroexd.hsdecktracker.core.cards.GameFormat
+import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.core.deck.DeckCode
 import com.stroexd.hsdecktracker.core.stats.MatchResult
 
@@ -18,8 +19,17 @@ sealed interface GameEvent {
     data class TurnOrderDetected(val friendlyWentFirst: Boolean) : GameEvent
     data class GameEnded(val result: MatchResult?) : GameEvent
 
-    /** Bilderkennung: eigene Karte gezogen (mögliche dbfIds, z. B. Kernset- und Legacy-Druck). */
-    data class FriendlyCardSeen(val dbfIds: List<Int>) : GameEvent
+    /**
+     * Bilderkennung: eigene Karte auf die Hand bekommen (mögliche dbfIds, z. B. Kernset- und Legacy-Druck).
+     * [fromDeck] = false bei Karten, die sicher nicht aus dem Deck stammen (z. B. per „Entdecken“ gewählt).
+     */
+    data class FriendlyCardSeen(val dbfIds: List<Int>, val fromDeck: Boolean = true) : GameEvent
+
+    /** Bilderkennung: Karte der Starthand beim Mulligan ins Deck zurückgelegt. */
+    data class FriendlyCardMulliganed(val dbfIds: List<Int>) : GameEvent
+
+    /** Bilderkennung: Klasse eines Spielers (Versus-Bildschirm bzw. Namensschild). */
+    data class ClassDetected(val friendly: Boolean, val hsClass: HsClass) : GameEvent
 
     /** Bilderkennung: Karte vom Gegner gespielt (mögliche dbfIds). */
     data class OpponentCardSeen(val dbfIds: List<Int>) : GameEvent

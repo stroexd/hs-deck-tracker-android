@@ -180,7 +180,7 @@ class ScreenRecognizer(
                 lines += OcrLine(line.text, box.left / w, box.top / h, box.right / w, box.bottom / h)
             }
         }
-        return OcrFrame(System.currentTimeMillis(), lines)
+        return OcrFrame(System.currentTimeMillis(), lines, aspect = w / h)
     }
 
     private fun Image.toBitmap(): Bitmap {
