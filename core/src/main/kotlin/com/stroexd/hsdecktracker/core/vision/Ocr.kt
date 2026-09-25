@@ -48,8 +48,15 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
 
     val size: Int get() = byKey.size
 
-    /** Beste Übereinstimmung für eine ganze Zeile, oder null. */
-    fun match(raw: String): NameMatch? {
+    /**
+     * Beste Übereinstimmung für eine ganze Zeile, oder null.
+     *
+     * @param preferred dbfIds, die im aktuellen Kontext plausibel sind (erkanntes Deck, Meta-Karten).
+     *   Karten aus dieser Menge werden bevorzugt und mit lockererer Schwelle akzeptiert – so werden
+     *   bekannte Deckkarten auch bei unsauberer Erkennung zuverlässiger getroffen, ohne dass der
+     *   globale Abgleich mehr Fehltreffer produziert.
+     */
+    fun match(raw: String, preferred: Set<Int> = emptySet()): NameMatch? {
         val key = normalize(raw)
         if (key.length < MIN_LENGTH) return null
         byKey[key]?.let { return NameMatch(key, it, 1.0) }
@@ -58,6 +65,8 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
         val maxDistance = max(2, key.length / 5)
         var best: String? = null
         var bestScore = 0.0
+        var bestPreferred: String? = null
+        var bestPreferredScore = 0.0
         for (candidate in candidates) {
             if (abs(candidate.length - key.length) > maxDistance) continue
             val score = similarity(key, candidate)
@@ -65,6 +74,15 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
                 bestScore = score
                 best = candidate
             }
+            if (preferred.isNotEmpty() && score > bestPreferredScore && byKey.getValue(candidate).any { it in preferred }) {
+                bestPreferredScore = score
+                bestPreferred = candidate
+            }
+        }
+        // Bevorzugte Karte (aus dem Deck) mit lockererer Schwelle
+        val preferredThreshold = if (key.length >= 8) 0.68 else 0.78
+        if (bestPreferred != null && bestPreferredScore >= preferredThreshold) {
+            return NameMatch(bestPreferred, byKey.getValue(bestPreferred).sortedByDescending { it in preferred }, bestPreferredScore)
         }
         val threshold = if (key.length >= 10) 0.8 else 0.85
         return if (best != null && bestScore >= threshold) NameMatch(best, byKey.getValue(best), bestScore) else null
@@ -74,8 +92,8 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
      * Sucht alle Kartennamen in einer Zeile. Versucht zuerst die ganze Zeile, danach
      * zusammenhängende Wortgruppen (falls die Erkennung zwei Namen zu einer Zeile verbindet).
      */
-    fun findAll(raw: String): List<NameMatch> {
-        match(raw)?.let { return listOf(it) }
+    fun findAll(raw: String, preferred: Set<Int> = emptySet()): List<NameMatch> {
+        match(raw, preferred)?.let { return listOf(it) }
         val words = normalize(raw).split(' ').filter { it.isNotBlank() }
         if (words.size < 2 || words.size > 10) return emptyList()
         val result = mutableListOf<NameMatch>()
@@ -85,7 +103,7 @@ class CardNameIndex(names: List<Pair<Int, String>>) {
             for (end in min(words.size, start + 5) downTo start + 1) {
                 val candidate = words.subList(start, end).joinToString(" ")
                 val m = byKey[candidate]?.let { NameMatch(candidate, it, 1.0) }
-                    ?: if (candidate.length >= 8) match(candidate)?.takeIf { it.score >= 0.9 } else null
+                    ?: if (candidate.length >= 8) match(candidate, preferred)?.takeIf { it.score >= 0.9 } else null
                 if (m != null) {
                     found = end to m
                     break

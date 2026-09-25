@@ -34,6 +34,8 @@ object ScreenRegions {
  */
 class VisionGameTracker(
     private val index: CardNameIndex,
+    /** dbfIds, die im Kontext plausibel sind (erkanntes Deck + Meta-Karten). Verbessert die Trefferquote. */
+    private val contextProvider: () -> Set<Int> = { emptySet() },
     private val missFrames: Int = 4,
     private val opponentRepeatMillis: Long = 2_500,
     private val idleTimeoutMillis: Long = 4 * 60_000,
@@ -163,6 +165,7 @@ class VisionGameTracker(
         val ownPopup = LinkedHashMap<String, Int>()
         val opponent = LinkedHashSet<String>()
         val recognized = mutableListOf<String>()
+        val preferred = contextProvider()
         for (line in frame.lines) {
             val normalized = CardNameIndex.normalize(line.text)
             if (normalized.isEmpty()) continue
@@ -178,7 +181,7 @@ class VisionGameTracker(
                     continue
                 }
             }
-            for (match in index.findAll(line.text)) {
+            for (match in index.findAll(line.text, preferred)) {
                 ids[match.key] = match.dbfIds
                 recognized += match.key
                 if (ScreenRegions.isCenter(line)) center.merge(match.key, 1, Int::plus)

@@ -153,13 +153,25 @@ class AppContainer(context: Context) {
     /** Wertet ein erkanntes Bildschirmfoto aus (Aufruf immer vom selben Hintergrund-Thread). */
     fun onScreenFrame(frame: OcrFrame): List<GameEvent> {
         val index = currentNameIndex() ?: return emptyList()
-        val vision = visionTracker ?: VisionGameTracker(index).also { visionTracker = it }
+        val vision = visionTracker ?: VisionGameTracker(index, contextProvider = ::recognitionContext).also { visionTracker = it }
         val events = vision.onFrame(frame)
         events.forEach { onGameEvent(it) }
         _recognition.update {
             it.copy(phase = vision.phase, recognized = vision.lastRecognized.take(8), frames = it.frames + 1)
         }
         return events
+    }
+
+    /**
+     * Karten, die im aktuellen Kontext plausibel sind: das laufende Deck, alle eigenen Decks
+     * und die Meta-Decks. Danach wird die Erkennung bevorzugt abgeglichen (weniger Fehltreffer).
+     */
+    private fun recognitionContext(): Set<Int> {
+        val result = HashSet<Int>()
+        tracker.state.value?.deckCards?.keys?.let { result += it }
+        decks.decks.value.forEach { result += it.cards.keys }
+        metaDecks().forEach { result += it.cards.keys }
+        return result
     }
 
     private fun currentNameIndex(): CardNameIndex? {

@@ -67,6 +67,18 @@ class VisionTest {
     }
 
     @Test
+    fun contextBoostsRecognitionOfKnownDeckCards() {
+        // Stark verrauschter Name (3 Fehler): global unter der Schwelle, aber mit Deck-Kontext ein Treffer.
+        val noisy = "Eviscorado"
+        assertNull(index.match(noisy))
+        assertEquals(105, index.match(noisy, preferred = setOf(105))?.dbfIds?.first())
+        // Kontext hebt die passende dbfId (Legacy-Backstab) nach vorne.
+        assertEquals(104, index.match("Bakstab", preferred = setOf(104))?.dbfIds?.first())
+        // Ohne echten Bezug bleibt es strikt – kein erzwungener Treffer.
+        assertNull(index.match("xyzqwert", preferred = setOf(105)))
+    }
+
+    @Test
     fun fullGameFromMulliganToVictory() {
         val tracker = VisionGameTracker(index)
         val events = mutableListOf<GameEvent>()
