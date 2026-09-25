@@ -5,32 +5,51 @@ import com.stroexd.hsdecktracker.core.cards.CardDatabase
 import com.stroexd.hsdecktracker.core.cards.CardType
 import com.stroexd.hsdecktracker.core.cards.FormatRules
 import com.stroexd.hsdecktracker.core.cards.GameFormat
+import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.core.cards.Rarity
 
-/** Eine Deck-Zeile: Karte (falls bekannt) und Anzahl. */
 data class DeckEntry(val dbfId: Int, val card: Card?, val count: Int) {
     val cost: Int get() = card?.cost ?: 0
-    val name: String get() = card?.name ?: "Unbekannte Karte ($dbfId)"
+    val name: String get() = card?.name ?: "#$dbfId"
 }
 
 data class DeckSummary(
-    /** Anzahl Karten je Manakosten 0..7+ (Index 7 = 7 und mehr). */
     val manaCurve: List<Int>,
     val typeCounts: Map<CardType, Int>,
     val rarityCounts: Map<Rarity, Int>,
     val totalCards: Int,
     val averageCost: Double,
-    /** Arkanstaub, um das komplette Deck herzustellen (ohne Sammlung). */
     val fullDustCost: Int,
 )
 
 enum class IssueSeverity { ERROR, WARNING }
 
-data class DeckIssue(val severity: IssueSeverity, val message: String)
+sealed interface DeckIssue {
+    val severity: IssueSeverity
+
+    data class WrongSize(val count: Int, val expected: Int) : DeckIssue {
+        override val severity get() = if (count > expected) IssueSeverity.ERROR else IssueSeverity.WARNING
+    }
+
+    data class UnknownCard(val dbfId: Int) : DeckIssue {
+        override val severity get() = IssueSeverity.WARNING
+    }
+
+    data class TooManyCopies(val card: Card) : DeckIssue {
+        override val severity get() = IssueSeverity.ERROR
+    }
+
+    /** Allowed only together with a Tourist. */
+    data class OtherClass(val card: Card, val deckClass: HsClass) : DeckIssue {
+        override val severity get() = IssueSeverity.WARNING
+    }
+
+    data class NotInFormat(val card: Card, val format: GameFormat) : DeckIssue {
+        override val severity get() = IssueSeverity.WARNING
+    }
+}
 
 object DeckAnalysis {
-
-    /** Prince Renathal erlaubt 40 Karten. */
     private const val RENATHAL_CARD_ID = "REV_018"
 
     fun entries(cards: Map<Int, Int>, db: CardDatabase): List<DeckEntry> = cards
@@ -74,49 +93,30 @@ object DeckAnalysis {
     fun validate(deck: Deck, db: CardDatabase, rules: FormatRules): List<DeckIssue> {
         val issues = mutableListOf<DeckIssue>()
         val expected = expectedSize(deck.cards, db)
-        val count = deck.cardCount
-        if (count != expected) {
-            issues += DeckIssue(
-                if (count > expected) IssueSeverity.ERROR else IssueSeverity.WARNING,
-                "Das Deck hat $count von $expected Karten.",
-            )
-        }
+        if (deck.cardCount != expected) issues += DeckIssue.WrongSize(deck.cardCount, expected)
         for ((id, copies) in deck.cards) {
             val card = db.byDbfId(id)
             if (card == null) {
-                if (!db.isEmpty) issues += DeckIssue(IssueSeverity.WARNING, "Unbekannte Karte (dbfId $id).")
+                if (!db.isEmpty) issues += DeckIssue.UnknownCard(id)
                 continue
             }
-            if (copies > card.maxCopies) {
-                issues += DeckIssue(IssueSeverity.ERROR, "${card.name}: maximal ${card.maxCopies}× erlaubt.")
-            }
-            if (deck.heroClass.isPlayable && !card.isAllowedIn(deck.heroClass)) {
-                issues += DeckIssue(
-                    IssueSeverity.WARNING,
-                    "${card.name} gehört nicht zur Klasse ${deck.heroClass.displayName} (nur mit Tourist erlaubt).",
-                )
-            }
-            if (!rules.isLegal(card, deck.format)) {
-                issues += DeckIssue(
-                    IssueSeverity.WARNING,
-                    "${card.name} ist in ${deck.format.displayName} nicht erlaubt.",
-                )
-            }
+            if (copies > card.maxCopies) issues += DeckIssue.TooManyCopies(card)
+            if (deck.heroClass.isPlayable && !card.isAllowedIn(deck.heroClass)) issues += DeckIssue.OtherClass(card, deck.heroClass)
+            if (!rules.isLegal(card, deck.format)) issues += DeckIssue.NotInFormat(card, deck.format)
         }
         return issues
     }
 
-    /** Der Text, den auch der Hearthstone-Client beim Kopieren erzeugt – inkl. Kartenliste. */
+    /** Same layout as Hearthstone's own deck export. */
     fun exportText(deck: Deck, db: CardDatabase): String = buildString {
         appendLine("### ${deck.name}")
-        appendLine("# Klasse: ${deck.heroClass.displayName}")
-        appendLine("# Format: ${deck.format.displayName}")
+        appendLine("# Class: ${deck.heroClass.englishName}")
+        appendLine("# Format: ${deck.format.englishName}")
         appendLine("#")
         for (entry in entries(deck.cards, db)) {
             appendLine("# ${entry.count}x (${entry.cost}) ${entry.name}")
         }
-        val sideboardOwners = deck.sideboards.groupBy { it.ownerDbfId }
-        for ((owner, cards) in sideboardOwners) {
+        for ((owner, cards) in deck.sideboards.groupBy { it.ownerDbfId }) {
             appendLine("#   ${db.byDbfId(owner)?.name ?: owner}:")
             for (sb in cards) {
                 val card = db.byDbfId(sb.dbfId)
@@ -126,7 +126,7 @@ object DeckAnalysis {
         appendLine("#")
         appendLine(deck.deckCode())
         appendLine("#")
-        append("# Um dieses Deck zu verwenden, kopiere es in deine Zwischenablage und erstelle ein neues Deck in Hearthstone.")
+        append("# To use this deck, copy it to your clipboard and create a new deck in Hearthstone")
     }
 
     fun isLegalIn(deck: Deck, format: GameFormat, db: CardDatabase, rules: FormatRules): Boolean =

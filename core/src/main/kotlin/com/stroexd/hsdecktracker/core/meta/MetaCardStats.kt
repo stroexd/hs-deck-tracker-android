@@ -7,12 +7,9 @@ import com.stroexd.hsdecktracker.core.collection.CardCollection
 import com.stroexd.hsdecktracker.core.collection.CollectionOptions
 import com.stroexd.hsdecktracker.core.collection.CraftingCalculator
 
-/** Wie häufig eine Karte in den Meta-Decks gespielt wird (gewichtet nach Anzahl Spielen). */
 data class CardPopularity(
     val dbfId: Int,
-    /** Anteil aller Meta-Spiele, deren Deck die Karte enthält. */
     val overallShare: Double,
-    /** Anteil je Klasse (nur Klassen, die die Karte spielen). */
     val classShares: Map<HsClass, Double>,
     val avgCopies: Double,
 ) {
@@ -24,12 +21,10 @@ data class CraftRecommendation(
     val missing: Int,
     val dustCost: Int,
     val popularity: CardPopularity,
-    /** Anzahl Meta-Decks, die durch diese Karte (zusammen mit bereits vorhandenen) komplett würden. */
     val completesDecks: Int,
 )
 
 object MetaCardStats {
-
     private fun weight(deck: MetaDeck): Double = (deck.totalGames ?: 1).coerceAtLeast(1).toDouble()
 
     fun popularity(decks: List<MetaDeck>): Map<Int, CardPopularity> {
@@ -57,10 +52,6 @@ object MetaCardStats {
         }
     }
 
-    /**
-     * Empfiehlt fehlende, herstellbare Karten: sortiert danach, wie viele Meta-Decks durch sie
-     * komplett würden und wie verbreitet sie im Meta sind.
-     */
     fun craftRecommendations(
         decks: List<MetaDeck>,
         collection: CardCollection,

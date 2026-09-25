@@ -4,6 +4,7 @@ package com.stroexd.hsdecktracker.ui.collection
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -57,6 +58,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -77,6 +81,7 @@ import com.stroexd.hsdecktracker.core.meta.MetaDeck
 import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.core.util.formatPercent
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.message
 import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.CardTile
 import com.stroexd.hsdecktracker.ui.components.ChipRow
@@ -95,7 +100,7 @@ import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.writeText
 import kotlinx.coroutines.launch
 
-private enum class SetScope(val label: String) { STANDARD("Standard-Sets"), ALL("Alle Sets") }
+private enum class SetScope(@StringRes val label: Int) { STANDARD(R.string.standard_sets), ALL(R.string.all_sets) }
 
 @Composable
 fun CollectionScreen(navController: NavHostController) {
@@ -125,7 +130,7 @@ fun CollectionScreen(navController: NavHostController) {
                 container.collection.applyImport(result)
                 importResult = result
             } catch (e: CollectionImportException) {
-                snackbar.showSnackbar(e.message ?: "Import fehlgeschlagen")
+                snackbar.showSnackbar(e.message(context))
             }
         }
     }
@@ -135,7 +140,7 @@ fun CollectionScreen(navController: NavHostController) {
             scope.launch {
                 runCatching { context.readText(uri) }
                     .onSuccess { runImport(it) }
-                    .onFailure { snackbar.showSnackbar("Datei konnte nicht gelesen werden: ${it.message}") }
+                    .onFailure { snackbar.showSnackbar(context.getString(R.string.file_read_failed, it.message.orEmpty())) }
             }
         }
     }
@@ -144,8 +149,8 @@ fun CollectionScreen(navController: NavHostController) {
         if (uri != null && content != null) {
             scope.launch {
                 runCatching { context.writeText(uri, content) }
-                    .onSuccess { snackbar.showSnackbar("Sammlung exportiert") }
-                    .onFailure { snackbar.showSnackbar("Export fehlgeschlagen: ${it.message}") }
+                    .onSuccess { snackbar.showSnackbar(context.getString(R.string.collection_exported)) }
+                    .onFailure { snackbar.showSnackbar(context.getString(R.string.export_failed, it.message.orEmpty())) }
             }
         }
         pendingExport = null
@@ -178,13 +183,13 @@ fun CollectionScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Sammlung") },
+                title = { Text(stringResource(R.string.tab_collection)) },
                 actions = {
                     IconButton(onClick = { navController.navigate(Routes.CRAFT_CHECK) }) {
-                        Icon(Icons.Filled.Calculate, contentDescription = "Deck-Code prüfen")
+                        Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.check_deck_code))
                     }
                     IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Einstellungen")
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings))
                     }
                 },
             )
@@ -196,9 +201,9 @@ fun CollectionScreen(navController: NavHostController) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (collection.isEmpty) {
-                            Text("Lade deine Sammlung hoch", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.upload_collection_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text(
-                                "Dann siehst du bei jedem Deck (eigene & Meta), welche Karten dir fehlen und wie viel Arkanstaub es kostet.",
+                                stringResource(R.string.upload_collection_message),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -206,33 +211,39 @@ fun CollectionScreen(navController: NavHostController) {
                             val s = summary
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("Vollständigkeit (${setScope.label})", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(stringResource(R.string.completion_of, stringResource(setScope.label)), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text(formatPercent(s?.fraction), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("Arkanstaub", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(stringResource(R.string.arcane_dust), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         DustLabel(collection.dust)
-                                        IconButton(onClick = { showDust = true }) { Icon(Icons.Filled.Edit, contentDescription = "Staub bearbeiten") }
+                                        IconButton(onClick = { showDust = true }) { Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit_dust)) }
                                     }
                                 }
                             }
                             LinearProgressIndicator(progress = { (s?.fraction ?: 0.0).toFloat() }, modifier = Modifier.fillMaxWidth())
                             if (s != null) {
                                 Text(
-                                    "${formatNumber(s.uniqueOwned)} von ${formatNumber(s.uniqueTotal)} Karten · " +
-                                        "${formatNumber(s.copiesOwned)}/${formatNumber(s.copiesTotal)} Exemplare",
+                                    stringResource(
+                                        R.string.collection_counts,
+                                        formatNumber(s.uniqueOwned),
+                                        formatNumber(s.uniqueTotal),
+                                        formatNumber(s.copiesOwned),
+                                        formatNumber(s.copiesTotal),
+                                    ),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 if (s.extraDust > 0) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Überzählige Karten entzaubern: ", style = MaterialTheme.typography.bodySmall)
+                                        Text(stringResource(R.string.disenchant_extras), style = MaterialTheme.typography.bodySmall)
                                         DustLabel(s.extraDust, prefix = "+")
                                     }
                                 }
                             }
                             Text(
-                                "Stand: ${formatDateTime(collection.updatedAt)}" + (collection.source?.let { " · Quelle: $it" } ?: ""),
+                                stringResource(R.string.updated_at, formatDateTime(collection.updatedAt)) +
+                                    (collection.source?.let { " · " + stringResource(R.string.source_of, it) } ?: ""),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -241,34 +252,34 @@ fun CollectionScreen(navController: NavHostController) {
                             Button(onClick = { openFile.launch(arrayOf("*/*")) }) {
                                 Icon(Icons.Filled.FileUpload, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
-                                Text("Datei hochladen")
+                                Text(stringResource(R.string.upload_file))
                             }
                             FilledTonalButton(onClick = { showPaste = true }) {
                                 Icon(Icons.Filled.ContentPaste, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
-                                Text("Text einfügen")
+                                Text(stringResource(R.string.paste_text))
                             }
                             if (!collection.isEmpty) {
                                 androidx.compose.foundation.layout.Box {
                                     OutlinedButton(onClick = { exportMenu = true }) {
                                         Icon(Icons.Filled.FileDownload, contentDescription = null)
                                         Spacer(Modifier.width(6.dp))
-                                        Text("Exportieren")
+                                        Text(stringResource(R.string.export))
                                     }
                                     DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }) {
-                                        DropdownMenuItem(text = { Text("Als JSON (HSReplay-Format)") }, onClick = {
+                                        DropdownMenuItem(text = { Text(stringResource(R.string.export_json)) }, onClick = {
                                             exportMenu = false
                                             pendingExport = CollectionExporter.toJson(collection)
-                                            saveFile.launch("hs-sammlung.json")
+                                            saveFile.launch("hs-collection.json")
                                         })
-                                        DropdownMenuItem(text = { Text("Als CSV") }, onClick = {
+                                        DropdownMenuItem(text = { Text(stringResource(R.string.export_csv)) }, onClick = {
                                             exportMenu = false
                                             pendingExport = CollectionExporter.toCsv(collection, db)
-                                            saveFile.launch("hs-sammlung.csv")
+                                            saveFile.launch("hs-collection.csv")
                                         })
                                     }
                                 }
-                                TextButton(onClick = { confirmClear = true }) { Text("Leeren") }
+                                TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.clear)) }
                             }
                         }
                     }
@@ -279,8 +290,8 @@ fun CollectionScreen(navController: NavHostController) {
             }
             if (!collection.isEmpty && buildableMeta.isNotEmpty()) {
                 item {
-                    SectionHeader("Günstigste Meta-Decks für dich") {
-                        TextButton(onClick = { navController.navigateTopLevel(Routes.META) }) { Text("Alle") }
+                    SectionHeader(stringResource(R.string.cheapest_meta_decks)) {
+                        TextButton(onClick = { navController.navigateTopLevel(Routes.META) }) { Text(stringResource(R.string.all)) }
                     }
                 }
                 items(buildableMeta, key = { "meta-" + it.first.id }) { (deck, analysis) ->
@@ -303,7 +314,7 @@ fun CollectionScreen(navController: NavHostController) {
                 }
             }
             if (!collection.isEmpty && recommendations.isNotEmpty()) {
-                item { SectionHeader("Lohnt sich herzustellen (Standard-Meta)") }
+                item { SectionHeader(stringResource(R.string.worth_crafting)) }
                 items(recommendations, key = { "rec-" + it.card.dbfId }) { rec ->
                     CardTile(
                         card = rec.card,
@@ -311,10 +322,12 @@ fun CollectionScreen(navController: NavHostController) {
                         cost = rec.card.cost,
                         count = rec.missing,
                         height = 48.dp,
-                        subtitle = buildString {
-                            append("${formatPercent(rec.popularity.overallShare, 0)} der Meta-Spiele")
-                            if (rec.completesDecks > 0) append(" · macht ${rec.completesDecks} Deck(s) komplett")
-                        },
+                        subtitle = stringResource(R.string.share_of_meta_games, formatPercent(rec.popularity.overallShare, 0)) +
+                            if (rec.completesDecks > 0) {
+                                " · " + pluralStringResource(R.plurals.completes_decks, rec.completesDecks, rec.completesDecks)
+                            } else {
+                                ""
+                            },
                         modifier = Modifier.padding(vertical = 2.dp),
                         onClick = { detail = rec.card },
                         trailing = { DustLabel(rec.dustCost, Modifier.padding(horizontal = 8.dp)) },
@@ -323,11 +336,11 @@ fun CollectionScreen(navController: NavHostController) {
             }
             item {
                 Column {
-                    SectionHeader("Sets")
+                    SectionHeader(stringResource(R.string.sets))
                     ChipRow(
                         options = SetScope.entries.toList(),
                         isSelected = { it == setScope },
-                        label = { it.label },
+                        label = { context.getString(it.label) },
                         onClick = { setScope = it },
                         contentPadding = PaddingValues(0.dp),
                     )
@@ -354,30 +367,30 @@ fun CollectionScreen(navController: NavHostController) {
     importResult?.let { result ->
         AlertDialog(
             onDismissRequest = { importResult = null },
-            title = { Text("Sammlung importiert") },
+            title = { Text(stringResource(R.string.collection_imported)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Format: ${result.detectedFormat}")
-                    Text("${formatNumber(result.importedCards)} verschiedene Karten, ${formatNumber(result.importedCopies)} Exemplare")
-                    result.dust?.let { Text("Arkanstaub: ${formatNumber(it)}") }
+                    Text(stringResource(R.string.import_format, result.detectedFormat))
+                    Text(stringResource(R.string.import_counts, formatNumber(result.importedCards), formatNumber(result.importedCopies)))
+                    result.dust?.let { Text(stringResource(R.string.import_dust, formatNumber(it))) }
                     if (result.unresolved.isNotEmpty()) {
                         Text(
-                            "${result.unresolved.size} Einträge nicht erkannt: " + result.unresolved.take(8).joinToString(),
+                            stringResource(R.string.import_unresolved, result.unresolved.size, result.unresolved.take(8).joinToString()),
                             color = HsColors.Warning,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { importResult = null }) { Text("OK") } },
+            confirmButton = { TextButton(onClick = { importResult = null }) { Text(stringResource(android.R.string.ok)) } },
         )
     }
     detail?.let { card -> CollectionCardDialog(card = card, onDismiss = { detail = null }) }
     if (confirmClear) {
         ConfirmDialog(
-            title = "Sammlung leeren?",
-            message = "Alle Karten werden aus der Sammlung entfernt (Arkanstaub bleibt erhalten).",
-            confirmLabel = "Leeren",
+            title = stringResource(R.string.clear_collection_title),
+            message = stringResource(R.string.clear_collection_message),
+            confirmLabel = stringResource(R.string.clear),
             onConfirm = { scope.launch { container.collection.clear() } },
             onDismiss = { confirmClear = false },
         )
@@ -397,7 +410,7 @@ private fun SetProgressRow(progress: SetProgress, showOwnership: Boolean, onClic
                 if (showOwnership) {
                     Text(formatPercent(progress.fraction, 0), style = MaterialTheme.typography.labelLarge)
                 } else {
-                    Text("${progress.uniqueTotal} Karten", style = MaterialTheme.typography.labelMedium)
+                    Text(pluralStringResource(R.plurals.card_count, progress.uniqueTotal, progress.uniqueTotal), style = MaterialTheme.typography.labelMedium)
                 }
             }
             if (showOwnership) {
@@ -410,12 +423,12 @@ private fun SetProgressRow(progress: SetProgress, showOwnership: Boolean, onClic
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${progress.uniqueOwned}/${progress.uniqueTotal} Karten",
+                        stringResource(R.string.cards_of, progress.uniqueOwned, progress.uniqueTotal),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    if (progress.dustToComplete > 0) DustLabel(progress.dustToComplete, prefix = "Rest: ")
+                    if (progress.dustToComplete > 0) DustLabel(progress.dustToComplete, prefix = stringResource(R.string.remaining_prefix))
                 }
             }
         }
@@ -429,18 +442,13 @@ private fun ImportHelpCard() {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Unterstützte Formate", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.supported_formats), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
-                "• HSReplay-Sammlungs-JSON: {\"collection\": {\"<dbfId>\": [normal, golden, diamant, signatur]}, \"dust\": 1234}\n" +
-                    "• JSON-Listen oder -Maps mit dbfId, Karten-ID oder Kartenname und Anzahl\n" +
-                    "• CSV/Tabellen (Trennzeichen ; , Tab), z. B. „Name;Anzahl;Golden“\n" +
-                    "• Freitext: eine Karte pro Zeile, z. B. „2x Feuerball“ oder „CS2_029 2“\n" +
-                    "• Exporte dieser App (JSON/CSV)",
+                stringResource(R.string.supported_formats_list),
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
-                "Tipp: Du kannst Karten auch einzeln pflegen (Set antippen) oder bei einem Deck „Karten zur Sammlung hinzufügen“ wählen. " +
-                    "Kernset-Karten zählen automatisch als besessen (in den Einstellungen änderbar).",
+                stringResource(R.string.collection_tip),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -454,20 +462,20 @@ private fun PasteCollectionDialog(onDismiss: () -> Unit, onImport: (String) -> U
     var text by rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Sammlung einfügen") },
+        title = { Text(stringResource(R.string.paste_collection)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 320.dp),
-                    placeholder = { Text("JSON, CSV oder eine Karte pro Zeile …") },
+                    placeholder = { Text(stringResource(R.string.paste_collection_placeholder)) },
                 )
-                TextButton(onClick = { context.readClipboardText()?.let { text = it } }) { Text("Aus Zwischenablage einfügen") }
+                TextButton(onClick = { context.readClipboardText()?.let { text = it } }) { Text(stringResource(R.string.paste_from_clipboard)) }
             }
         },
-        confirmButton = { Button(onClick = { onImport(text) }, enabled = text.isNotBlank()) { Text("Importieren") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        confirmButton = { Button(onClick = { onImport(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.import_action)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
@@ -476,17 +484,17 @@ private fun DustDialog(current: Int, onDismiss: () -> Unit, onSave: (Int) -> Uni
     var text by rememberSaveable { mutableStateOf(current.toString()) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Arkanstaub") },
+        title = { Text(stringResource(R.string.arcane_dust)) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { v -> text = v.filter { it.isDigit() }.take(7) },
-                label = { Text("Vorhandener Staub") },
+                label = { Text(stringResource(R.string.current_dust)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
         },
-        confirmButton = { Button(onClick = { onSave(text.toIntOrNull() ?: 0) }) { Text("Speichern") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+        confirmButton = { Button(onClick = { onSave(text.toIntOrNull() ?: 0) }) { Text(stringResource(R.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

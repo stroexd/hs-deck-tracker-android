@@ -23,19 +23,14 @@ data class CollectionImportResult(
     val dust: Int?,
 )
 
-class CollectionImportException(message: String) : IllegalArgumentException(message)
+class CollectionImportException(
+    val reason: Reason,
+    val unresolved: List<String> = emptyList(),
+) : IllegalArgumentException(reason.name) {
+    enum class Reason { EMPTY, INVALID_JSON, UNKNOWN_FORMAT, NO_CARDS }
+}
 
-/**
- * Liest Sammlungen aus verschiedenen Formaten:
- *
- * - HSReplay-Sammlungs-JSON: `{"collection": {"<dbfId>": [normal, golden, diamond, signature]}, "dust": 1234}`
- * - JSON-Map `{"<dbfId|cardId|Name>": anzahl}` oder Liste von Objekten/Paaren
- *   (`[{"dbfId": 1, "count": 2, "golden": 0}]`, `[[dbfId, anzahl], ...]`)
- * - CSV/Text: eine Karte pro Zeile – `dbfId;anzahl[;golden]`, `Name,2`, `2x Feuerball`, `CS2_029 2`
- *   (Kopfzeile mit Spaltennamen wie `name;count;golden` wird erkannt).
- */
 object CollectionImporter {
-
     private val idKeys = listOf("dbfid", "dbf_id", "dbf", "id", "cardid", "card_id", "name", "karte", "kartenname", "card")
     private val countKeys = listOf("count", "normal", "anzahl", "amount", "quantity", "owned", "menge", "copies", "plain")
     private val goldenKeys = listOf("golden", "gold", "goldene", "premium", "goldencount", "golden_count")
@@ -45,22 +40,20 @@ object CollectionImporter {
 
     fun import(text: String, db: CardDatabase, now: Long): CollectionImportResult {
         val trimmed = text.trim().removePrefix("﻿")
-        if (trimmed.isEmpty()) throw CollectionImportException("Die Datei ist leer.")
+        if (trimmed.isEmpty()) throw CollectionImportException(CollectionImportException.Reason.EMPTY)
         val acc = Accumulator(db)
         val format = if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
             val element = try {
                 PrettyJson.parseToJsonElement(trimmed)
             } catch (e: Exception) {
-                throw CollectionImportException("Ungültiges JSON: ${e.message}")
+                throw CollectionImportException(CollectionImportException.Reason.INVALID_JSON)
             }
             importJson(element, acc)
         } else {
             importText(trimmed, acc)
         }
         if (acc.cards.isEmpty()) {
-            throw CollectionImportException(
-                "Keine Karten erkannt." + if (acc.unresolved.isNotEmpty()) " Unbekannt: ${acc.unresolved.take(5).joinToString()}" else "",
-            )
+            throw CollectionImportException(CollectionImportException.Reason.NO_CARDS, acc.unresolved)
         }
         return CollectionImportResult(
             collection = CardCollection(cards = acc.cards, dust = acc.dust ?: 0, updatedAt = now, source = format),
@@ -96,8 +89,6 @@ object CollectionImporter {
         }
     }
 
-    // ---------------------------------------------------------------- JSON
-
     private fun importJson(element: JsonElement, acc: Accumulator): String {
         when (element) {
             is JsonObject -> {
@@ -105,16 +96,16 @@ object CollectionImporter {
                 val collection = element["collection"] ?: element["cards"] ?: element["sammlung"]
                 if (collection != null) {
                     importJsonCards(collection, acc)
-                    return if (element.containsKey("collection")) "HSReplay-JSON" else "JSON"
+                    return if (element.containsKey("collection")) "HSReplay JSON" else "JSON"
                 }
                 importJsonCards(element, acc)
-                return "JSON-Map"
+                return "JSON map"
             }
             is JsonArray -> {
                 importJsonCards(element, acc)
-                return "JSON-Liste"
+                return "JSON list"
             }
-            else -> throw CollectionImportException("Unbekanntes JSON-Format.")
+            else -> throw CollectionImportException(CollectionImportException.Reason.UNKNOWN_FORMAT)
         }
     }
 
@@ -178,8 +169,6 @@ object CollectionImporter {
     private fun primitiveString(element: JsonElement): String? =
         (element as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
-    // ---------------------------------------------------------------- CSV / Text
-
     private val countFirstRegex = Regex("^(\\d+)\\s*[x×]?\\s+(\\D.*)$", RegexOption.IGNORE_CASE)
     private val countPrefixXRegex = Regex("^(\\d+)\\s*[x×]\\s*(.+)$", RegexOption.IGNORE_CASE)
     private val trailingCountRegex = Regex("^(.+?)\\s+[x×]?(\\d{1,3})$", RegexOption.IGNORE_CASE)
@@ -219,7 +208,6 @@ object CollectionImporter {
         if (delimiter != null) {
             val cols = splitCsv(line, delimiter).map { it.trim() }.filter { it.isNotEmpty() }
             if (cols.isEmpty()) return
-            // "2;Feuerball" – Anzahl zuerst, Name danach
             if (cols.size == 2 && cols[0].toIntOrNull() != null && cols[1].toIntOrNull() == null) {
                 acc.add(cols[1], OwnedCard(normal = cols[0].toInt()))
                 return
@@ -233,7 +221,6 @@ object CollectionImporter {
             acc.add(match.groupValues[2].trim(), OwnedCard(normal = match.groupValues[1].toInt()))
             return
         }
-        // Ganze Zeile ist ein Kartenname (auch Namen mit Zahl am Ende, z. B. "Zilliax Deluxe 3000")
         if (acc.canResolve(line)) {
             acc.add(line, OwnedCard(normal = 1))
             return
@@ -268,7 +255,6 @@ object CollectionImporter {
         return Header(id, indexOf(countKeys), indexOf(goldenKeys), indexOf(diamondKeys), indexOf(signatureKeys))
     }
 
-    /** Einfacher CSV-Splitter mit Unterstützung für Anführungszeichen. */
     internal fun splitCsv(line: String, delimiter: Char): List<String> {
         val result = mutableListOf<String>()
         val current = StringBuilder()
@@ -290,8 +276,6 @@ object CollectionImporter {
 }
 
 object CollectionExporter {
-
-    /** Export im HSReplay-kompatiblen Format (wieder importierbar). */
     fun toJson(collection: CardCollection): String = PrettyJson.encodeToString(
         JsonObject.serializer(),
         buildJsonObject {

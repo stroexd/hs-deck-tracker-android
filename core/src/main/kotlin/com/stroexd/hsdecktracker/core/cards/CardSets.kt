@@ -1,21 +1,13 @@
 package com.stroexd.hsdecktracker.core.cards
 
-/**
- * Wissen über Karten-Sets: Anzeigenamen und welche Sets (standardmäßig) Wild sind.
- *
- * Standard rotiert jährlich. Alle hier als [wildSets] gelisteten Sets sind sicher rotiert.
- * Unbekannte, neuere Sets gelten als Standard. In den Einstellungen lässt sich
- * jedes Set manuell überschreiben.
- */
 object CardSets {
-
-    val displayNames: Map<String, String> = mapOf(
-        "CORE" to "Kernset",
+    private val names: Map<String, String> = mapOf(
+        "CORE" to "Core",
         "LEGACY" to "Legacy",
-        "EXPERT1" to "Legacy (Klassik)",
-        "BASIC" to "Basis",
-        "VANILLA" to "Klassisch",
-        "HOF" to "Ruhmeshalle",
+        "EXPERT1" to "Legacy (Classic)",
+        "BASIC" to "Basic",
+        "VANILLA" to "Classic",
+        "HOF" to "Hall of Fame",
         "NAXX" to "Naxxramas",
         "GVG" to "Goblins vs Gnomes",
         "BRM" to "Blackrock Mountain",
@@ -59,16 +51,13 @@ object CardSets {
         "TAVERNS_OF_TIME" to "Taverns of Time",
     )
 
-    /** Sets, deren Karten niemand herstellen muss (kostenlos für alle Spieler). */
     val freeSets: Set<String> = setOf("CORE", "BASIC")
 
-    /** Sets, die nicht in Constructed-Decks vorkommen. */
     val nonConstructedSets: Set<String> = setOf(
         "HERO_SKINS", "TB", "MISSIONS", "CREDITS", "CHEAT", "DEMO", "NONE", "INVALID",
         "SLUSH", "TUTORIAL", "MERCENARIES", "LETTUCE", "BATTLEGROUNDS", "PLACEHOLDER_202204",
     )
 
-    /** Sets, die zum Stand dieser App-Version sicher nicht (mehr) Standard sind. */
     val wildSets: Set<String> = setOf(
         "LEGACY", "EXPERT1", "BASIC", "HOF", "NAXX", "GVG", "BRM", "TGT", "LOE", "OG", "KARA",
         "GANGS", "UNGORO", "ICECROWN", "LOOTAPALOOZA", "GILNEAS", "BOOMSDAY", "TROLL", "DALARAN",
@@ -81,7 +70,7 @@ object CardSets {
 
     const val CLASSIC_SET = "VANILLA"
 
-    fun displayName(set: String): String = displayNames[set] ?: prettify(set)
+    fun displayName(set: String): String = names[set] ?: prettify(set)
 
     fun isStandardByDefault(set: String): Boolean =
         set !in wildSets && set != CLASSIC_SET && set !in nonConstructedSets
@@ -89,12 +78,10 @@ object CardSets {
     private fun prettify(set: String): String = set.split('_')
         .filter { it.isNotBlank() }
         .joinToString(" ") { part -> part.lowercase().replaceFirstChar { it.uppercase() } }
-        .ifBlank { "Unbekannt" }
+        .ifBlank { set }
 }
 
-/** Entscheidet, ob eine Karte in einem Format erlaubt ist. */
 class FormatRules(private val standardOverrides: Map<String, Boolean> = emptyMap()) {
-
     fun isStandardSet(set: String): Boolean = standardOverrides[set] ?: CardSets.isStandardByDefault(set)
 
     fun isLegal(card: Card, format: GameFormat): Boolean = when (format) {

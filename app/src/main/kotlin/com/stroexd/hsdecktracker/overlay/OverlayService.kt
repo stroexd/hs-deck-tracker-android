@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
@@ -61,22 +62,21 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.stroexd.hsdecktracker.AppContainer
 import com.stroexd.hsdecktracker.MainActivity
 import com.stroexd.hsdecktracker.R
-import com.stroexd.hsdecktracker.RecognitionStatus
 import com.stroexd.hsdecktracker.appContainer
+import com.stroexd.hsdecktracker.core.vision.VisionGameTracker
+import com.stroexd.hsdecktracker.ui.ProvideAppLocale
+import com.stroexd.hsdecktracker.ui.labelRes
+import com.stroexd.hsdecktracker.ui.localized
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.HsTheme
 import com.stroexd.hsdecktracker.ui.tracker.TrackerPanel
 import com.stroexd.hsdecktracker.vision.DiagnosticsRecorder
 import com.stroexd.hsdecktracker.vision.ScreenRecognizer
 
-/**
- * Vordergrund-Dienst: zeigt den Tracker als verschiebbares Fenster über Hearthstone und
- * erkennt – nach Zustimmung zur Bildschirmaufnahme – Partien automatisch per Texterkennung.
- */
 class OverlayService : LifecycleService(), SavedStateRegistryOwner {
-
     private val savedStateController = SavedStateRegistryController.create(this)
     override val savedStateRegistry: SavedStateRegistry get() = savedStateController.savedStateRegistry
 
@@ -114,14 +114,13 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     }
 
     private fun startInForeground(capturing: Boolean) {
-        val manager = getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Tracker-Overlay", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Wird angezeigt, solange der Tracker aktiv ist"
-                },
-            )
-        }
+        val text = localized()
+        // Re-creating an existing channel only updates its name, so it follows language changes
+        getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, text.getString(R.string.overlay_channel), NotificationManager.IMPORTANCE_LOW).apply {
+                description = text.getString(R.string.overlay_channel_description)
+            },
+        )
         val openApp = PendingIntent.getActivity(
             this,
             0,
@@ -138,11 +137,11 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         )
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_tracker)
-            .setContentTitle("HS Deck Tracker")
-            .setContentText(if (capturing) "Erkennt Partien automatisch" else "Overlay aktiv")
+            .setContentTitle(text.getString(R.string.app_name))
+            .setContentText(text.getString(if (capturing) R.string.notification_recognizing else R.string.notification_overlay_active))
             .setOngoing(true)
             .setContentIntent(openApp)
-            .addAction(0, "Beenden", stop)
+            .addAction(0, text.getString(R.string.stop), stop)
             .build()
         var type = 0
         if (Build.VERSION.SDK_INT >= 34) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
@@ -164,9 +163,11 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             context = this,
             projection = projection,
             maskProvider = { overlayBounds },
-            onFrame = { frame, bitmap ->
-                val events = container.onScreenFrame(frame)
-                diagnostics?.let { runCatching { it.record(frame, events, bitmap) } }
+            pacing = { container.capturePacing() },
+            onFrame = { frame, bitmap, reused ->
+                val notes = diagnostics?.let { mutableListOf<String>() }
+                val events = container.onScreenFrame(frame, notes, reused)
+                diagnostics?.let { runCatching { it.record(frame, events, notes.orEmpty(), bitmap) } }
             },
             onStopped = {
                 container.onRecognitionStopped()
@@ -196,12 +197,15 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             setViewTreeLifecycleOwner(this@OverlayService)
             setViewTreeSavedStateRegistryOwner(this@OverlayService)
             setContent {
-                HsTheme {
-                    OverlayContent(
-                        onDrag = { dx, dy -> moveBy(dx, dy) },
-                        onClose = { stopSelf() },
-                        onTextInput = { focusable -> setFocusable(focusable) },
-                    )
+                val locale by appContainer.appLocale.collectAsStateWithLifecycle()
+                ProvideAppLocale(locale) {
+                    HsTheme {
+                        OverlayContent(
+                            onDrag = { dx, dy -> moveBy(dx, dy) },
+                            onClose = { stopSelf() },
+                            onTextInput = { focusable -> setFocusable(focusable) },
+                        )
+                    }
                 }
             }
             addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updateBounds() }
@@ -226,7 +230,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
         updateBounds()
     }
 
-    /** Für Texteingaben (Kartensuche) muss das Fenster kurzzeitig fokussierbar sein. */
     private fun setFocusable(focusable: Boolean) {
         val view = overlayView ?: return
         val p = params ?: return
@@ -265,11 +268,9 @@ private fun OverlayContent(
     val cardState by container.cards.state.collectAsStateWithLifecycle()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val metaState by container.meta.state.collectAsStateWithLifecycle()
-    val recognition by container.recognition.collectAsStateWithLifecycle()
     val decks by container.decks.decks.collectAsStateWithLifecycle()
     var collapsed by remember { mutableStateOf(false) }
 
-    // Bei Spielstart automatisch aufklappen
     LaunchedEffect(state?.startedAt) {
         if (state != null) collapsed = false
     }
@@ -318,9 +319,9 @@ private fun OverlayContent(
                     .padding(start = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.DragIndicator, contentDescription = "Verschieben", modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.DragIndicator, contentDescription = stringResource(R.string.move), modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                RecognitionDot(recognition)
+                RecognitionDot(container)
                 Text(
                     "HS Tracker",
                     style = MaterialTheme.typography.labelMedium,
@@ -328,7 +329,7 @@ private fun OverlayContent(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = { collapsed = true }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.Remove, contentDescription = "Minimieren", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Remove, contentDescription = stringResource(R.string.minimize), modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = {
                     val intent = Intent(context, MainActivity::class.java)
@@ -336,31 +337,16 @@ private fun OverlayContent(
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     context.startActivity(intent)
                 }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.OpenInFull, contentDescription = "App öffnen", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.OpenInFull, contentDescription = stringResource(R.string.open_app), modifier = Modifier.size(16.dp))
                 }
                 IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = "Schließen", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), modifier = Modifier.size(18.dp))
                 }
             }
-            if (settings.showRecognitionDebug && recognition.active) {
-                Text(
-                    "${recognition.phaseLabel} · Bild ${recognition.frames}: " + recognition.recognized.joinToString(", "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-            }
+            if (settings.showRecognitionDebug) RecognitionDebugLine(container)
             val current = state
             if (current == null) {
-                Text(
-                    if (recognition.active) {
-                        "Automatische Erkennung aktiv – der Tracker startet von selbst, sobald eine Partie beginnt (Mulligan)."
-                    } else {
-                        "Automatische Erkennung ist aus. Öffne die App und tippe auf „Spielen“, damit Partien automatisch erkannt werden."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(10.dp),
-                )
+                IdleHint(container)
             } else {
                 TrackerPanel(
                     state = current,
@@ -383,11 +369,38 @@ private fun OverlayContent(
 }
 
 @Composable
-private fun RecognitionDot(recognition: RecognitionStatus) {
+private fun RecognitionDebugLine(container: AppContainer) {
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    if (!recognition.active) return
+    Text(
+        stringResource(
+            R.string.recognition_debug,
+            stringResource(recognition.phase.labelRes()),
+            recognition.frames,
+            recognition.recognized.joinToString(", "),
+        ),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+    )
+}
+
+@Composable
+private fun IdleHint(container: AppContainer) {
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    Text(
+        stringResource(if (recognition.active) R.string.idle_hint_active else R.string.idle_hint_off),
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(10.dp),
+    )
+}
+
+@Composable
+private fun RecognitionDot(container: AppContainer) {
+    val recognition by container.recognition.collectAsStateWithLifecycle()
     val color = when {
         !recognition.active -> MaterialTheme.colorScheme.outline
-        recognition.phase == com.stroexd.hsdecktracker.core.vision.VisionGameTracker.Phase.PLAYING ||
-            recognition.phase == com.stroexd.hsdecktracker.core.vision.VisionGameTracker.Phase.MULLIGAN -> HsColors.Win
+        recognition.phase == VisionGameTracker.Phase.PLAYING || recognition.phase == VisionGameTracker.Phase.MULLIGAN -> HsColors.Win
         else -> HsColors.Warning
     }
     Box(

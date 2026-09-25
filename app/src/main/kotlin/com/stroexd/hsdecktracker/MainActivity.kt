@@ -14,13 +14,14 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.stroexd.hsdecktracker.ui.HsTrackerApp
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.ProvideAppLocale
+import com.stroexd.hsdecktracker.ui.localized
 import com.stroexd.hsdecktracker.ui.theme.HsTheme
 
 class MainActivity : ComponentActivity() {
-
-    /** Per „Teilen“ empfangener Text (z. B. ein Deck-Code aus dem Browser). */
     private var sharedText by mutableStateOf<String?>(null)
     private var openTracker by mutableStateOf(false)
     private var playRequested by mutableStateOf(false)
@@ -35,16 +36,19 @@ class MainActivity : ComponentActivity() {
         publishPlayShortcut()
         val container = appContainer
         setContent {
-            HsTheme {
-                CompositionLocalProvider(LocalAppContainer provides container) {
-                    HsTrackerApp(
-                        sharedText = sharedText,
-                        onSharedTextHandled = { sharedText = null },
-                        openTracker = openTracker,
-                        onTrackerOpened = { openTracker = false },
-                        playRequested = playRequested,
-                        onPlayHandled = { playRequested = false },
-                    )
+            val locale by container.appLocale.collectAsStateWithLifecycle()
+            ProvideAppLocale(locale) {
+                HsTheme {
+                    CompositionLocalProvider(LocalAppContainer provides container) {
+                        HsTrackerApp(
+                            sharedText = sharedText,
+                            onSharedTextHandled = { sharedText = null },
+                            openTracker = openTracker,
+                            onTrackerOpened = { openTracker = false },
+                            playRequested = playRequested,
+                            onPlayHandled = { playRequested = false },
+                        )
+                    }
                 }
             }
         }
@@ -68,11 +72,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Kurzbefehl am App-Symbol: „Spielen & tracken“. */
     private fun publishPlayShortcut() {
+        val text = localized()
         val shortcut = ShortcutInfoCompat.Builder(this, "play")
-            .setShortLabel("Spielen & tracken")
-            .setLongLabel("Hearthstone mit Tracker starten")
+            .setShortLabel(text.getString(R.string.play_and_track_button))
+            .setLongLabel(text.getString(R.string.shortcut_play_long))
             .setIcon(IconCompat.createWithResource(this, R.drawable.ic_shortcut_play))
             .setIntent(Intent(this, MainActivity::class.java).setAction(ACTION_PLAY))
             .build()

@@ -6,33 +6,27 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
-enum class MatchResult(val displayName: String) {
-    WIN("Sieg"),
-    LOSS("Niederlage"),
-    DRAW("Unentschieden"),
-}
+enum class MatchResult { WIN, LOSS, DRAW }
 
-enum class MatchSource(val displayName: String) {
-    MANUAL("Manuell"),
-    TRACKER("Tracker"),
-    LOG("Automatisch"),
+@Serializable
+enum class MatchSource {
+    MANUAL,
+    TRACKER,
+
+    @SerialName("LOG")
+    AUTO,
 }
 
 enum class TimelineType {
-    /** Eigene Karte aus dem Deck gezogen */
     DRAW,
 
-    /** Eigene Karte zurück ins Deck (Mulligan, Effekte) */
     RETURN,
 
-    /** Karte gezogen, die nicht aus der Deckliste stammt (z. B. generiert) */
     EXTRA_DRAW,
 
-    /** Vom Gegner gespielte Karte */
     OPPONENT_PLAY,
 }
 
-/** Ein Ereignis im Partieverlauf – kompakt gespeichert (kurze JSON-Schlüssel). */
 @Serializable
 data class TimelineEvent(
     @SerialName("t") val turn: Int,
@@ -51,23 +45,19 @@ data class MatchRecord(
     val opponentClass: HsClass = HsClass.UNKNOWN,
     val result: MatchResult,
     val format: GameFormat = GameFormat.STANDARD,
-    /** true = am Zug, false = mit Münze, null = unbekannt */
     val wentFirst: Boolean? = null,
     val turns: Int? = null,
     val durationSeconds: Int? = null,
-    /** dbfIds der vom Gegner gespielten Karten */
     val opponentCards: List<Int> = emptyList(),
     val opponentArchetype: String? = null,
     val source: MatchSource = MatchSource.MANUAL,
     val notes: String = "",
-    /** Zugverlauf (nur bei Partien aus dem Tracker). */
     val timeline: List<TimelineEvent> = emptyList(),
 )
 
 data class WinRate(val wins: Int = 0, val losses: Int = 0, val draws: Int = 0) {
     val games: Int get() = wins + losses + draws
 
-    /** Siegquote ohne Unentschieden; null, wenn noch keine Partie gewertet wurde. */
     val rate: Double? get() = if (wins + losses == 0) null else wins.toDouble() / (wins + losses)
 
     operator fun plus(result: MatchResult): WinRate = when (result) {
@@ -90,7 +80,6 @@ data class StatsFilter(
 )
 
 object StatsCalculator {
-
     fun filter(matches: List<MatchRecord>, filter: StatsFilter): List<MatchRecord> = matches.filter { m ->
         (filter.sinceMillis == null || m.timestamp >= filter.sinceMillis) &&
             (filter.format == null || m.format == filter.format) &&
@@ -113,15 +102,13 @@ object StatsCalculator {
         matches.groupBy { it.deckId ?: "name:${it.deckName}" }
             .map { (_, list) ->
                 val latest = list.maxBy { it.timestamp }
-                DeckWinRate(latest.deckId, latest.deckName.ifBlank { "Ohne Deck" }, latest.playerClass, overall(list))
+                DeckWinRate(latest.deckId, latest.deckName, latest.playerClass, overall(list))
             }
             .sortedByDescending { it.winRate.games }
 
-    /** Siegquote am Zug (first) und mit Münze (second). */
     fun byTurnOrder(matches: List<MatchRecord>): Pair<WinRate, WinRate> =
         overall(matches.filter { it.wentFirst == true }) to overall(matches.filter { it.wentFirst == false })
 
-    /** Gleitende Siegquote über die letzten [window] Partien, chronologisch. */
     fun rollingWinRate(matches: List<MatchRecord>, window: Int = 10): List<Double> {
         val sorted = matches.filter { it.result != MatchResult.DRAW }.sortedBy { it.timestamp }
         if (sorted.isEmpty()) return emptyList()

@@ -29,7 +29,7 @@ class CollectionTest {
     fun importsHsReplayJson() {
         val json = """{"collection": {"1": [2, 0, 0, 0], "3": [0, 1], "5": [1, 1, 0, 1], "99999": [1]}, "dust": 1500, "favorite_heroes": {}}"""
         val result = CollectionImporter.import(json, db, now = 1)
-        assertEquals("HSReplay-JSON", result.detectedFormat)
+        assertEquals("HSReplay JSON", result.detectedFormat)
         assertEquals(1500, result.dust)
         assertEquals(2, result.collection.owned(FIREBALL))
         assertEquals(1, result.collection.owned(LEEROY))
@@ -110,7 +110,6 @@ class CollectionTest {
         val deck = mapOf(FIREBALL to 2, ARCANE_MISSILES to 2, LEEROY to 1, REWARD_LEGENDARY to 1, BASIC to 2, EPIC_MAGE to 2)
         val collection = CardCollection(cards = mapOf(FIREBALL to OwnedCard(1), EPIC_MAGE to OwnedCard(0, 2)))
         val analysis = CraftingCalculator.analyze(deck, emptyList(), collection, db)
-        // Feuerball 1× (40) + Leeroy (1600); Belohnungskarte ist nicht herstellbar
         assertEquals(1640, analysis.dustCost)
         assertEquals(1, analysis.uncraftableMissing)
         assertEquals(3, analysis.missingCount)
@@ -128,7 +127,6 @@ class CollectionTest {
         val withCore = CraftingCalculator.analyze(deck, sideboard, empty, db)
         assertEquals(100, withCore.dustCost)
         assertTrue(withCore.craftableWith(100))
-        // Ohne Kernset-Freischaltung fehlen die Kernset-Karten – herstellbar sind sie trotzdem nicht.
         val withoutCore = CraftingCalculator.analyze(deck, sideboard, empty, db, CollectionOptions(coreSetOwned = false))
         assertEquals(100, withoutCore.dustCost)
         assertEquals(2, withoutCore.uncraftableMissing)
@@ -152,13 +150,11 @@ class CollectionTest {
         )
         val summary = CollectionStats.summarize(db, collection)
         val timeTravel = summary.sets.first { it.set == "TIME_TRAVEL" }
-        // Leeroy (1/1), Seltener Diener (1/2), Belohnungskarte (0/1)
         assertEquals(3, timeTravel.uniqueTotal)
         assertEquals(2, timeTravel.uniqueOwned)
         assertEquals(2, timeTravel.copiesOwned)
         assertEquals(4, timeTravel.copiesTotal)
         assertEquals(100, timeTravel.dustToComplete)
-        // Leeroy: 2 überzählige normale (goldene bleibt) → 2 × 400; Feuerball: 2 überzählige → 2 × 5
         assertEquals(810, summary.extraDust)
     }
 }

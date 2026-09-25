@@ -1,6 +1,7 @@
 package com.stroexd.hsdecktracker.ui
 
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -19,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -27,6 +29,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
@@ -70,14 +73,14 @@ object Routes {
     fun match(id: String) = "match/${Uri.encode(id)}"
 }
 
-private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
+private data class TopLevel(val route: String, @StringRes val label: Int, val icon: ImageVector)
 
 private val topLevel = listOf(
-    TopLevel(Routes.DECKS, "Decks", Icons.Filled.Style),
-    TopLevel(Routes.META, "Meta", Icons.Filled.Leaderboard),
-    TopLevel(Routes.CARDS, "Karten", Icons.Filled.GridView),
-    TopLevel(Routes.COLLECTION, "Sammlung", Icons.Filled.Inventory2),
-    TopLevel(Routes.STATS, "Statistik", Icons.Filled.QueryStats),
+    TopLevel(Routes.DECKS, R.string.tab_decks, Icons.Filled.Style),
+    TopLevel(Routes.META, R.string.tab_meta, Icons.Filled.Leaderboard),
+    TopLevel(Routes.CARDS, R.string.tab_cards, Icons.Filled.GridView),
+    TopLevel(Routes.COLLECTION, R.string.tab_collection, Icons.Filled.Inventory2),
+    TopLevel(Routes.STATS, R.string.tab_stats, Icons.Filled.QueryStats),
 )
 
 @Composable
@@ -120,7 +123,7 @@ fun HsTrackerApp(
                             selected = currentRoute == destination.route,
                             onClick = { navController.navigateTopLevel(destination.route) },
                             icon = { Icon(destination.icon, contentDescription = null) },
-                            label = { Text(destination.label) },
+                            label = { Text(stringResource(destination.label)) },
                         )
                     }
                 }

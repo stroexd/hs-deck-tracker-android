@@ -35,6 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +48,8 @@ import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckTextParser
 import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
+import com.stroexd.hsdecktracker.ui.defaultDeckName
+import com.stroexd.hsdecktracker.ui.label
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
 import com.stroexd.hsdecktracker.ui.components.CollectionCardDialog
 import com.stroexd.hsdecktracker.ui.components.CraftSummaryCard
@@ -53,7 +58,6 @@ import com.stroexd.hsdecktracker.ui.readClipboardText
 import com.stroexd.hsdecktracker.ui.toast
 import kotlinx.coroutines.launch
 
-/** „Kann ich das bauen?“ – Deck-Codes einfügen und sofort gegen die Sammlung prüfen. */
 @Composable
 fun CraftCheckScreen(navController: NavHostController) {
     val container = LocalAppContainer.current
@@ -66,7 +70,7 @@ fun CraftCheckScreen(navController: NavHostController) {
     var detail by remember { mutableStateOf<Card?>(null) }
 
     val decks = remember(text, cardState.db) {
-        DeckTextParser.parseAll(text).map { Deck.fromDefinition(it.definition, it.name, cardState.db, System.currentTimeMillis()) }
+        DeckTextParser.parseAll(text).map { Deck.fromDefinition(it.definition, it.name, cardState.db, System.currentTimeMillis(), defaultName = defaultDeckName(context)) }
     }
     val analyses = remember(decks, collection, cardState.db, settings.coreSetOwned) {
         decks.map { CraftingCalculator.analyze(it.cards, it.sideboards, collection, cardState.db, settings.collectionOptions) }
@@ -75,10 +79,10 @@ fun CraftCheckScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Deck-Code prüfen") },
+                title = { Text(stringResource(R.string.check_deck_code)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
             )
@@ -91,15 +95,15 @@ fun CraftCheckScreen(navController: NavHostController) {
                         value = text,
                         onValueChange = { text = it },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = 200.dp),
-                        placeholder = { Text("Deck-Code(s) hier einfügen …") },
+                        placeholder = { Text(stringResource(R.string.paste_deck_codes)) },
                     )
                     Row {
-                        TextButton(onClick = { context.readClipboardText()?.let { text = it } }) { Text("Aus Zwischenablage") }
-                        TextButton(onClick = { text = "" }) { Text("Leeren") }
+                        TextButton(onClick = { context.readClipboardText()?.let { text = it } }) { Text(stringResource(R.string.from_clipboard)) }
+                        TextButton(onClick = { text = "" }) { Text(stringResource(R.string.clear)) }
                     }
                     if (collection.isEmpty) {
                         Text(
-                            "Hinweis: Noch keine Sammlung hinterlegt – es wird der volle Staubwert angezeigt.",
+                            stringResource(R.string.no_collection_full_dust),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -107,7 +111,7 @@ fun CraftCheckScreen(navController: NavHostController) {
                 }
             }
             if (decks.isEmpty() && text.isNotBlank()) {
-                item { EmptyState(Icons.Filled.SearchOff, "Kein gültiger Deck-Code", "Deck-Codes beginnen mit „AAE…“.") }
+                item { EmptyState(Icons.Filled.SearchOff, stringResource(R.string.no_valid_deck_code), stringResource(R.string.deck_codes_start_with)) }
             }
             items(decks.indices.toList()) { index ->
                 val deck = decks[index]
@@ -118,15 +122,15 @@ fun CraftCheckScreen(navController: NavHostController) {
                             Text(deck.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 ClassBadge(deck.heroClass)
-                                Text("${deck.format.displayName} · ${deck.cardCount} Karten", style = MaterialTheme.typography.bodySmall)
+                                Text("${deck.format.label()} · " + pluralStringResource(R.plurals.card_count, deck.cardCount, deck.cardCount), style = MaterialTheme.typography.bodySmall)
                             }
                         }
                         FilledTonalButton(onClick = {
                             scope.launch {
                                 container.decks.upsert(deck)
-                                context.toast("„${deck.name}“ gespeichert")
+                                context.toast(context.getString(R.string.deck_saved, deck.name))
                             }
-                        }) { Text("Speichern") }
+                        }) { Text(stringResource(R.string.save)) }
                     }
                     CraftSummaryCard(
                         analysis = analysis,
@@ -136,7 +140,7 @@ fun CraftCheckScreen(navController: NavHostController) {
                     )
                     if (collection.isEmpty) {
                         Text(
-                            "Voller Staubwert: ${formatNumber(analysis.dustCost)}",
+                            stringResource(R.string.full_dust_value, formatNumber(analysis.dustCost)),
                             style = MaterialTheme.typography.labelMedium,
                         )
                     }

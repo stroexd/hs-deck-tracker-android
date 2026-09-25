@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.appContainer
 import com.stroexd.hsdecktracker.ui.toast
 
@@ -39,12 +40,10 @@ object OverlayLauncher {
         context.startActivity(intent)
     }
 
-    /** Overlay ohne Bildschirmerkennung (manuelles Tracking). */
     fun start(context: Context) {
         ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
     }
 
-    /** Overlay mit automatischer Bildschirmerkennung (nach Zustimmung zur Bildschirmaufnahme). */
     fun startWithCapture(context: Context, resultCode: Int, data: Intent) {
         val intent = Intent(context, OverlayService::class.java)
             .putExtra(EXTRA_RESULT_CODE, resultCode)
@@ -56,7 +55,6 @@ object OverlayLauncher {
         context.stopService(Intent(context, OverlayService::class.java))
     }
 
-    /** Startet Hearthstone, falls installiert. */
     fun launchHearthstone(context: Context): Boolean {
         val intent = context.packageManager.getLaunchIntentForPackage(HEARTHSTONE_PACKAGE) ?: return false
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -64,11 +62,6 @@ object OverlayLauncher {
     }
 }
 
-/**
- * „Spielen & tracken“: holt fehlende Berechtigungen ein (einmalig „Über anderen Apps einblenden“,
- * ab Android 13 Benachrichtigungen), fragt nach der Bildschirmaufnahme, startet Overlay + Erkennung
- * und öffnet Hearthstone. Danach läuft alles automatisch.
- */
 @Composable
 fun rememberTrackingStarter(launchGame: Boolean = true): () -> Unit {
     val context = LocalContext.current
@@ -80,17 +73,16 @@ fun rememberTrackingStarter(launchGame: Boolean = true): () -> Unit {
         if (result.resultCode == Activity.RESULT_OK && data != null) {
             OverlayLauncher.startWithCapture(context, result.resultCode, data)
         } else {
-            context.toast("Ohne Bildschirmaufnahme keine automatische Erkennung – Karten können im Overlay angetippt werden.")
+            context.toast(context.getString(R.string.capture_denied))
             OverlayLauncher.start(context)
         }
         if (currentLaunchGame && !OverlayLauncher.launchHearthstone(context)) {
-            context.toast("Hearthstone ist nicht installiert")
+            context.toast(context.getString(R.string.hearthstone_not_installed))
         }
     }
     val requestCapture: () -> Unit = remember(context, captureLauncher) {
         {
             if (context.appContainer.recognition.value.active) {
-                // Erkennung läuft bereits – nur noch das Spiel öffnen
                 OverlayLauncher.start(context)
                 if (currentLaunchGame) OverlayLauncher.launchHearthstone(context)
             } else {
@@ -114,7 +106,6 @@ fun rememberTrackingStarter(launchGame: Boolean = true): () -> Unit {
         }
     }
 
-    // Nach der Rückkehr aus den Systemeinstellungen automatisch weitermachen.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, proceed) {
         val observer = LifecycleEventObserver { _, event ->
@@ -131,7 +122,7 @@ fun rememberTrackingStarter(launchGame: Boolean = true): () -> Unit {
         {
             if (!OverlayLauncher.canDrawOverlays(context)) {
                 waitingForOverlayPermission = true
-                context.toast("Einmalig: „Über anderen Apps einblenden“ für HS Deck Tracker erlauben.")
+                context.toast(context.getString(R.string.overlay_permission_hint))
                 OverlayLauncher.requestOverlayPermission(context)
             } else {
                 proceed()

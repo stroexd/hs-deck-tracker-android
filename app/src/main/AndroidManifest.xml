@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Um Hearthstone direkt aus dem Tracker starten zu können -->
+    <!-- Launch Hearthstone from the tracker -->
     <queries>
         <package android:name="com.blizzard.wtcg.hearthstone" />
     </queries>
@@ -33,7 +33,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Deck-Codes aus anderen Apps (Browser, Discord …) teilen -->
+            <!-- Deck codes shared from other apps (browser, Discord, …) -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -47,7 +47,7 @@
             android:foregroundServiceType="specialUse|mediaProjection">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Deck-Tracker-Overlay, das während einer Hearthstone-Partie über dem Spiel angezeigt wird" />
+                android:value="Deck tracker overlay shown on top of Hearthstone during a game" />
         </service>
 
         <provider

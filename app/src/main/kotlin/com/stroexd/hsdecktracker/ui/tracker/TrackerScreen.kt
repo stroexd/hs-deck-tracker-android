@@ -21,6 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -29,15 +30,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
-import com.stroexd.hsdecktracker.core.stats.MatchResult
+import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.overlay.OverlayLauncher
 import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
 import com.stroexd.hsdecktracker.ui.components.EmptyState
+import com.stroexd.hsdecktracker.ui.label
+import com.stroexd.hsdecktracker.ui.labelRes
 import com.stroexd.hsdecktracker.ui.toast
 
 @Composable
@@ -55,22 +60,22 @@ fun TrackerScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tracker") },
+                title = { Text(stringResource(R.string.tracker)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
-                    IconButton(onClick = { startOverlay() }) { Icon(Icons.Filled.Layers, contentDescription = "Als Overlay anzeigen") }
+                    IconButton(onClick = { startOverlay() }) { Icon(Icons.Filled.Layers, contentDescription = stringResource(R.string.show_as_overlay)) }
                     IconButton(onClick = {
-                        if (!OverlayLauncher.launchHearthstone(context)) context.toast("Hearthstone ist nicht installiert")
-                    }) { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Hearthstone öffnen") }
+                        if (!OverlayLauncher.launchHearthstone(context)) context.toast(context.getString(R.string.hearthstone_not_installed))
+                    }) { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = stringResource(R.string.open_hearthstone)) }
                     if (state != null) {
                         IconButton(onClick = {
                             container.tracker.stop()
                             OverlayLauncher.stop(context)
-                        }) { Icon(Icons.Filled.Stop, contentDescription = "Tracker beenden") }
+                        }) { Icon(Icons.Filled.Stop, contentDescription = stringResource(R.string.stop_tracker)) }
                     }
                 },
             )
@@ -82,23 +87,21 @@ fun TrackerScreen(navController: NavHostController) {
                 item {
                     EmptyState(
                         icon = Icons.Filled.Style,
-                        title = if (recognition.active) "Warte auf die nächste Partie" else "Automatisch tracken",
-                        message = if (recognition.active) {
-                            "Die Erkennung läuft. Sobald in Hearthstone der Mulligan erscheint, startet der Tracker und erkennt dein Deck selbst."
-                        } else {
-                            "Tippe auf „Spielen“: Hearthstone startet, Spielstart, dein Deck und die Karten des Gegners werden automatisch erkannt."
-                        },
+                        title = stringResource(if (recognition.active) R.string.waiting_for_game else R.string.track_automatically),
+                        message = stringResource(
+                            if (recognition.active) R.string.waiting_for_game_message else R.string.track_automatically_message,
+                        ),
                         actions = {
                             Button(onClick = { startOverlay() }) {
                                 Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                                Text("  Spielen & tracken")
+                                Text(stringResource(R.string.play_and_track_button), Modifier.padding(start = 8.dp))
                             }
                         },
                     )
                 }
                 item {
                     Text(
-                        "Oder ein Deck fest vorgeben:",
+                        stringResource(R.string.or_pick_deck),
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
@@ -106,13 +109,21 @@ fun TrackerScreen(navController: NavHostController) {
                 items(decks.sortedByDescending { it.updatedAt }, key = { it.id }) { deck ->
                     ListItem(
                         headlineContent = { Text(deck.name) },
-                        supportingContent = { Text("${deck.format.displayName} · ${deck.cardCount} Karten") },
+                        supportingContent = {
+                            Text(
+                                stringResource(
+                                    R.string.deck_format_cards,
+                                    deck.format.label(),
+                                    pluralStringResource(R.plurals.card_count, deck.cardCount, deck.cardCount),
+                                ),
+                            )
+                        },
                         leadingContent = { ClassBadge(deck.heroClass) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                         tonalElevation = 0.dp,
-                        colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
                         trailingContent = {
-                            IconButton(onClick = { container.tracker.start(deck) }) { Icon(Icons.Filled.Style, contentDescription = "Starten") }
+                            IconButton(onClick = { container.tracker.start(deck) }) { Icon(Icons.Filled.Style, contentDescription = stringResource(R.string.start)) }
                         },
                     )
                 }
@@ -130,7 +141,7 @@ fun TrackerScreen(navController: NavHostController) {
                 onUpdate = { container.tracker.update(it) },
                 onFinish = { result ->
                     container.finishGame(result)
-                    context.toast(if (result == MatchResult.WIN) "Sieg gespeichert" else "Niederlage gespeichert")
+                    context.toast(context.getString(R.string.result_saved, context.getString(result.labelRes())))
                 },
                 onNewGame = { container.tracker.newGame() },
                 modifier = Modifier.fillMaxSize(),

@@ -2,7 +2,6 @@ package com.stroexd.hsdecktracker.core
 
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
 
-/** Kleine Kartendatenbank im HearthstoneJSON-Format (inkl. unbekannter Felder). */
 object TestCards {
     const val FIREBALL = 1
     const val ARCANE_MISSILES = 2

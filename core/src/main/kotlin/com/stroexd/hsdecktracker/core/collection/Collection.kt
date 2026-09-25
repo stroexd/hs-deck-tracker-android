@@ -7,7 +7,6 @@ import com.stroexd.hsdecktracker.core.cards.Rarity
 import com.stroexd.hsdecktracker.core.deck.SideboardCard
 import kotlinx.serialization.Serializable
 
-/** Besessene Exemplare einer Karte, aufgeteilt nach Premium-Stufe. */
 @Serializable
 data class OwnedCard(
     val normal: Int = 0,
@@ -27,7 +26,6 @@ data class OwnedCard(
 
 @Serializable
 data class CardCollection(
-    /** dbfId → besessene Exemplare */
     val cards: Map<Int, OwnedCard> = emptyMap(),
     val dust: Int = 0,
     val updatedAt: Long = 0,
@@ -37,7 +35,6 @@ data class CardCollection(
 
     fun owned(dbfId: Int): Int = cards[dbfId]?.total ?: 0
 
-    /** Setzt die Anzahl normaler Exemplare; Goldene & Co. bleiben erhalten. */
     fun withNormalCount(dbfId: Int, normal: Int): CardCollection {
         val current = cards[dbfId] ?: OwnedCard()
         val updated = current.copy(normal = normal.coerceAtLeast(0))
@@ -45,7 +42,6 @@ data class CardCollection(
         return copy(cards = newCards)
     }
 
-    /** Ergänzt fehlende Exemplare, sodass mindestens [required] Stück vorhanden sind. */
     fun ensureAtLeast(dbfId: Int, required: Int): CardCollection {
         val current = cards[dbfId] ?: OwnedCard()
         if (current.total >= required) return this
@@ -54,7 +50,6 @@ data class CardCollection(
 }
 
 data class CollectionOptions(
-    /** Kernset-Karten sind seit 2021 für alle Spieler kostenlos. */
     val coreSetOwned: Boolean = true,
 )
 
@@ -79,7 +74,6 @@ data class CraftAnalysis(
     val missingCount: Int get() = missing.sumOf { it.missing }
     val ownedFraction: Double get() = if (totalCards == 0) 1.0 else ownedCards.toDouble() / totalCards
 
-    /** Deck ist mit dem vorhandenen Staub vollständig herstellbar. */
     fun craftableWith(dust: Int): Boolean = uncraftableMissing == 0 && dustCost <= dust
 
     companion object {
@@ -88,17 +82,12 @@ data class CraftAnalysis(
 }
 
 object CraftingCalculator {
-
     fun ownedCopies(card: Card, collection: CardCollection, options: CollectionOptions): Int {
         if (card.rarityType == Rarity.FREE) return card.maxCopies
         if (options.coreSetOwned && card.set in CardSets.freeSets) return card.maxCopies
         return collection.owned(card.dbfId)
     }
 
-    /**
-     * Vergleicht ein Deck mit der Sammlung: welche Karten fehlen und wie viel Arkanstaub kostet es.
-     * Sideboard-Karten (E.T.C.) zählen mit, sofern es normale sammelbare Karten sind.
-     */
     fun analyze(
         cards: Map<Int, Int>,
         sideboards: List<SideboardCard>,
@@ -157,7 +146,6 @@ data class CollectionSummary(
     val uniqueTotal: Int,
     val copiesOwned: Int,
     val copiesTotal: Int,
-    /** Staub, der durch Entzaubern überzähliger Exemplare frei würde. */
     val extraDust: Int,
     val sets: List<SetProgress>,
 ) {
@@ -165,7 +153,6 @@ data class CollectionSummary(
 }
 
 object CollectionStats {
-
     fun summarize(
         db: CardDatabase,
         collection: CardCollection,
@@ -198,7 +185,6 @@ object CollectionStats {
         return SetProgress(set, uniqueOwned, cards.size, copiesOwned, copiesTotal, dust)
     }
 
-    /** Staub durch Entzaubern aller Exemplare über dem Maximum (goldene Karten werden behalten). */
     fun extraDust(db: CardDatabase, collection: CardCollection): Int {
         var dust = 0
         for ((id, owned) in collection.cards) {

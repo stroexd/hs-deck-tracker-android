@@ -18,8 +18,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DeckCodeTest {
-
-    /** Beispiel-Deckstring aus der HearthSim-Dokumentation (Jäger, Standard, 30 Karten). */
     private val knownCode = "AAECAR8GxwPJBLsFmQfZB/gIDI0B2AGoArUDhwSSBe0G6wfbCe0JgQr+DAA="
 
     @Test
@@ -110,7 +108,7 @@ class DeckCodeTest {
         val unknownHero = DeckDefinition(listOf(999999), GameFormat.STANDARD, mapOf(FIREBALL to 2, LEEROY to 1))
         assertEquals(HsClass.MAGE, Deck.detectClass(unknownHero, db))
         val imported = Deck.fromDefinition(mage, null, db, now = 5)
-        assertEquals("Magier-Deck", imported.name)
+        assertEquals("Mage Deck", imported.name)
         assertTrue(imported.deckCode().startsWith("AAE"))
     }
 }
