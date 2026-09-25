@@ -43,6 +43,9 @@ Deck-Tracker, Deck-Datenbank und Sammlungsverwaltung für Hearthstone – inspir
   - Nur echte Kartennamen zählen – Namen im Kartentext („Herold: Sinestra“), Sprechblasen und „Entdecken“-Auswahl werden ignoriert
   - Züge, am Zug/Münze und Ergebnis (Sieg/Niederlage) → Partie landet automatisch in der Match-History
     (sehr kurze „Partien“ ohne Zugwechsel werden als Fehlerkennung verworfen)
+- **Akkuschonend:** Bildschirm wird nur im Takt aufgenommen (Partie ~2 Bilder/s, Menü alle 1,5 s), dazwischen ist die
+  Aufnahme abgekoppelt; unveränderte Bilder sparen sich die Texterkennung; Pause bei ausgeschaltetem Bildschirm oder
+  Hochformat; im Stromsparmodus bzw. bei Überhitzung automatisch langsamer
 - Hearthstone-Client auf Deutsch oder Englisch
 - Verschiebbares, minimierbares **Overlay** über dem Spiel; Korrekturen per Antippen jederzeit möglich
 - Android fragt einmal pro Sitzung nach der Bildschirmaufnahme (Systemvorgabe); einmalig muss „Über anderen Apps einblenden“ erlaubt werden

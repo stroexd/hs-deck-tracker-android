@@ -22,6 +22,7 @@ import com.stroexd.hsdecktracker.core.tracker.TrackerState
 import com.stroexd.hsdecktracker.core.vision.CardNameIndex
 import com.stroexd.hsdecktracker.core.vision.OcrFrame
 import com.stroexd.hsdecktracker.core.vision.VisionGameTracker
+import com.stroexd.hsdecktracker.vision.CapturePacing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,8 +40,12 @@ import java.io.File
 data class RecognitionStatus(
     val active: Boolean = false,
     val phase: VisionGameTracker.Phase = VisionGameTracker.Phase.IDLE,
+    /** Zuletzt erkannte Kartennamen – nur bei eingeschalteter Erkennungsanzeige (spart Neuzeichnen). */
     val recognized: List<String> = emptyList(),
+    /** Ausgewertete Bildschirmfotos (wird nur gelegentlich aktualisiert). */
     val frames: Int = 0,
+    /** Davon mit Texterkennung – der Rest war unverändert und hat das letzte Ergebnis wiederverwendet. */
+    val ocrFrames: Int = 0,
 ) {
     val phaseLabel: String
         get() = when (phase) {
@@ -78,6 +83,8 @@ class AppContainer(context: Context) {
     private var nameIndex: CardNameIndex? = null
     private var nameIndexSources: Pair<CardDatabase, CardDatabase>? = null
     private var visionTracker: VisionGameTracker? = null
+    private var frameCount = 0
+    private var ocrFrameCount = 0
 
     init {
         // Kartendatenbank laden und bei Sprachwechsel neu laden.
@@ -140,6 +147,8 @@ class AppContainer(context: Context) {
 
     fun onRecognitionStarted() {
         visionTracker = null
+        frameCount = 0
+        ocrFrameCount = 0
         _recognition.value = RecognitionStatus(active = true)
         // Meta-Decks für Deck-Erkennung und Gegner-Vorhersage bereithalten
         appScope.launch { meta.refresh(GameFormat.STANDARD, settings.value, cards.db) }
@@ -151,17 +160,38 @@ class AppContainer(context: Context) {
     }
 
     /**
+     * Takt der Bildschirmauswertung: in einer Partie etwa zwei Bilder pro Sekunde, sonst (Menü,
+     * nach Spielende) nur alle 1,5 s – der Versus-Bildschirm ist lange genug sichtbar.
+     */
+    fun capturePacing(): CapturePacing = when (_recognition.value.phase) {
+        VisionGameTracker.Phase.PLAYING -> CapturePacing(intervalMillis = 500, maxReuseMillis = 1_500)
+        VisionGameTracker.Phase.MULLIGAN -> CapturePacing(intervalMillis = 600, maxReuseMillis = 1_500)
+        VisionGameTracker.Phase.IDLE, VisionGameTracker.Phase.ENDED -> CapturePacing(intervalMillis = 1_500, maxReuseMillis = 4_000)
+    }
+
+    /**
      * Wertet ein erkanntes Bildschirmfoto aus (Aufruf immer vom selben Hintergrund-Thread).
      * @param notes nimmt für den Diagnose-Modus die Begründungen der Erkennung auf.
+     * @param reused Bild war unverändert, das Ergebnis stammt aus der vorigen Texterkennung.
      */
-    fun onScreenFrame(frame: OcrFrame, notes: MutableList<String>? = null): List<GameEvent> {
+    fun onScreenFrame(frame: OcrFrame, notes: MutableList<String>? = null, reused: Boolean = false): List<GameEvent> {
         val index = currentNameIndex() ?: return emptyList()
         val vision = visionTracker ?: VisionGameTracker(index, contextProvider = ::recognitionContext).also { visionTracker = it }
         vision.decisionLog = notes?.let { list -> { note: String -> list += note } }
         val events = vision.onFrame(frame)
         events.forEach { onGameEvent(it) }
-        _recognition.update {
-            it.copy(phase = vision.phase, recognized = vision.lastRecognized.take(8), frames = it.frames + 1)
+        frameCount++
+        if (!reused) ocrFrameCount++
+        // Status nur bei Bedarf veröffentlichen – jede Änderung zeichnet das Overlay neu
+        val debug = settings.value.showRecognitionDebug
+        val current = _recognition.value
+        if (current.phase != vision.phase || debug || frameCount % STATUS_EVERY_FRAMES == 0) {
+            _recognition.value = current.copy(
+                phase = vision.phase,
+                recognized = if (debug) vision.lastRecognized.take(8) else emptyList(),
+                frames = frameCount,
+                ocrFrames = ocrFrameCount,
+            )
         }
         return events
     }
@@ -197,5 +227,6 @@ class AppContainer(context: Context) {
 
     private companion object {
         const val ENGLISH = "enUS"
+        const val STATUS_EVERY_FRAMES = 20
     }
 }

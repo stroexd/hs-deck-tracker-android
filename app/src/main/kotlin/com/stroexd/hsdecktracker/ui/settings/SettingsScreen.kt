@@ -326,8 +326,16 @@ fun SettingsScreen(navController: NavHostController) {
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        if (recognition.active) "Status: aktiv · ${recognition.phaseLabel} · ${recognition.frames} Bilder ausgewertet"
-                        else "Status: aus",
+                        if (recognition.active) {
+                            "Status: aktiv · ${recognition.phaseLabel} · ${recognition.frames} Bilder ausgewertet" +
+                                if (recognition.frames > 0) {
+                                    " (${recognition.frames - recognition.ocrFrames} unverändert, Texterkennung gespart)"
+                                } else {
+                                    ""
+                                }
+                        } else {
+                            "Status: aus"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         color = if (recognition.active) HsColors.Win else MaterialTheme.colorScheme.onSurfaceVariant,
                     )

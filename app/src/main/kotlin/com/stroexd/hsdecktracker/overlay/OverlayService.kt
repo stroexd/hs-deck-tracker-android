@@ -63,7 +63,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.stroexd.hsdecktracker.MainActivity
 import com.stroexd.hsdecktracker.R
-import com.stroexd.hsdecktracker.RecognitionStatus
+import com.stroexd.hsdecktracker.AppContainer
 import com.stroexd.hsdecktracker.appContainer
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.HsTheme
@@ -164,9 +164,10 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
             context = this,
             projection = projection,
             maskProvider = { overlayBounds },
-            onFrame = { frame, bitmap ->
+            pacing = { container.capturePacing() },
+            onFrame = { frame, bitmap, reused ->
                 val notes = diagnostics?.let { mutableListOf<String>() }
-                val events = container.onScreenFrame(frame, notes)
+                val events = container.onScreenFrame(frame, notes, reused)
                 diagnostics?.let { runCatching { it.record(frame, events, notes.orEmpty(), bitmap) } }
             },
             onStopped = {
@@ -266,7 +267,6 @@ private fun OverlayContent(
     val cardState by container.cards.state.collectAsStateWithLifecycle()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val metaState by container.meta.state.collectAsStateWithLifecycle()
-    val recognition by container.recognition.collectAsStateWithLifecycle()
     val decks by container.decks.decks.collectAsStateWithLifecycle()
     var collapsed by remember { mutableStateOf(false) }
 
@@ -321,7 +321,7 @@ private fun OverlayContent(
             ) {
                 Icon(Icons.Filled.DragIndicator, contentDescription = "Verschieben", modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                RecognitionDot(recognition)
+                RecognitionDot(container)
                 Text(
                     "HS Tracker",
                     style = MaterialTheme.typography.labelMedium,
@@ -343,25 +343,10 @@ private fun OverlayContent(
                     Icon(Icons.Filled.Close, contentDescription = "Schließen", modifier = Modifier.size(18.dp))
                 }
             }
-            if (settings.showRecognitionDebug && recognition.active) {
-                Text(
-                    "${recognition.phaseLabel} · Bild ${recognition.frames}: " + recognition.recognized.joinToString(", "),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-            }
+            if (settings.showRecognitionDebug) RecognitionDebugLine(container)
             val current = state
             if (current == null) {
-                Text(
-                    if (recognition.active) {
-                        "Automatische Erkennung aktiv – der Tracker startet von selbst, sobald eine Partie beginnt (Mulligan)."
-                    } else {
-                        "Automatische Erkennung ist aus. Öffne die App und tippe auf „Spielen“, damit Partien automatisch erkannt werden."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(10.dp),
-                )
+                IdleHint(container)
             } else {
                 TrackerPanel(
                     state = current,
@@ -383,8 +368,38 @@ private fun OverlayContent(
     }
 }
 
+// Die folgenden Bausteine lesen den Erkennungsstatus selbst: Ändert er sich, wird nur der
+// jeweilige Baustein neu gezeichnet – nicht das ganze Overlay mit der Kartenliste.
+
 @Composable
-private fun RecognitionDot(recognition: RecognitionStatus) {
+private fun RecognitionDebugLine(container: AppContainer) {
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    if (!recognition.active) return
+    Text(
+        "${recognition.phaseLabel} · Bild ${recognition.frames}: " + recognition.recognized.joinToString(", "),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+    )
+}
+
+@Composable
+private fun IdleHint(container: AppContainer) {
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    Text(
+        if (recognition.active) {
+            "Automatische Erkennung aktiv – der Tracker startet von selbst, sobald eine Partie beginnt."
+        } else {
+            "Automatische Erkennung ist aus. Öffne die App und tippe auf „Spielen“, damit Partien automatisch erkannt werden."
+        },
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.padding(10.dp),
+    )
+}
+
+@Composable
+private fun RecognitionDot(container: AppContainer) {
+    val recognition by container.recognition.collectAsStateWithLifecycle()
     val color = when {
         !recognition.active -> MaterialTheme.colorScheme.outline
         recognition.phase == com.stroexd.hsdecktracker.core.vision.VisionGameTracker.Phase.PLAYING ||
