@@ -335,7 +335,7 @@ fun MatchHistoryContent(
             ChipRow(
                 options = HistoryPeriod.entries.toList(),
                 isSelected = { it == period },
-                label = { stringResource(it.label) },
+                label = { context.getString(it.label) },
                 onClick = { period = it },
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -344,7 +344,9 @@ fun MatchHistoryContent(
             ChipRow(
                 options = listOf<HsClass?>(null) + HsClass.playable,
                 isSelected = { it == opponent },
-                label = { it?.let { cls -> stringResource(R.string.vs_class, cls.label()) } ?: stringResource(R.string.all_opponents) },
+                label = { cls ->
+                    if (cls == null) context.getString(R.string.all_opponents) else context.getString(R.string.vs_class, context.getString(cls.labelRes()))
+                },
                 onClick = { opponent = it },
                 modifier = Modifier.padding(vertical = 4.dp),
             )

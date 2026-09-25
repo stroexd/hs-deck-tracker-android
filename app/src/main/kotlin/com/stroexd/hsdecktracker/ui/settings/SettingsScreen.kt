@@ -152,13 +152,12 @@ fun SettingsScreen(navController: NavHostController) {
                         selected = settings.language,
                         onSelect = { code -> update { it.copy(language = code) } },
                     )
+                    val detected = settings.detectedGameLocale
                     Text(
-                        if (settings.language != GameLocales.AUTO) {
-                            stringResource(R.string.language_ui_note)
-                        } else if (settings.detectedGameLocale != null) {
-                            stringResource(R.string.language_auto_detected, localeName(settings.detectedGameLocale))
-                        } else {
-                            stringResource(R.string.language_auto_pending, localeName(gameLocale))
+                        when {
+                            settings.language != GameLocales.AUTO -> stringResource(R.string.language_ui_note)
+                            detected != null -> stringResource(R.string.language_auto_detected, localeName(detected))
+                            else -> stringResource(R.string.language_auto_pending, localeName(gameLocale))
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
