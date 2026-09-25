@@ -208,7 +208,7 @@
     <string name="edit_deck">Edit deck</string>
     <string name="save">Save</string>
     <string name="cards_of">%1$d/%2$d cards</string>
-    <string name="missing_prefix">Missing: </string>
+    <string name="missing_prefix">"Missing: "</string>
     <string name="deck_with_count">Deck (%1$d)</string>
     <string name="card_search_placeholder">Card, text, tribe …</string>
     <string name="all_classes">All classes</string>
@@ -237,7 +237,7 @@
     <string name="completion_of">Completion (%1$s)</string>
     <string name="edit_dust">Edit dust</string>
     <string name="collection_counts">%1$s of %2$s cards · %3$s/%4$s copies</string>
-    <string name="disenchant_extras">Disenchant extra cards: </string>
+    <string name="disenchant_extras">"Disenchant extra cards: "</string>
     <string name="updated_at">Updated: %1$s</string>
     <string name="source_of">Source: %1$s</string>
     <string name="upload_file">Upload file</string>
@@ -260,7 +260,7 @@
     <string name="import_unresolved">%1$d entries not recognized: %2$s</string>
     <string name="clear_collection_title">Clear collection?</string>
     <string name="clear_collection_message">All cards will be removed from the collection (Arcane Dust is kept).</string>
-    <string name="remaining_prefix">Left: </string>
+    <string name="remaining_prefix">"Left: "</string>
     <string name="supported_formats">Supported formats</string>
     <string name="supported_formats_list">• HSReplay collection JSON: {\"collection\": {\"&lt;dbfId&gt;\": [normal, golden, diamond, signature]}, \"dust\": 1234}\n• JSON lists or maps with dbfId, card ID or card name and count\n• CSV/tables (separator ; , tab), e.g. \"Name;Count;Golden\"\n• Free text: one card per line, e.g. \"2x Fireball\" or \"CS2_029 2\"\n• Exports of this app (JSON/CSV)</string>
     <string name="collection_tip">Tip: You can also maintain cards one by one (tap a set) or choose \"Add cards to collection\" on a deck. Core set cards count as owned automatically (can be changed in the settings).</string>
@@ -276,7 +276,7 @@
     <string name="own_all_cards">Own all cards (max.)</string>
     <string name="remove_all_cards">Remove all cards</string>
     <string name="set_progress">%1$d/%2$d cards · %3$s of copies</string>
-    <string name="to_complete_prefix">To complete: </string>
+    <string name="to_complete_prefix">"To complete: "</string>
     <string name="set_tap_hint">Tap: change count (0 → 1 → 2 → 0) · Long press: details</string>
     <string name="own_set_title">Own the whole set?</string>
     <string name="clear_set_title">Clear set?</string>
@@ -354,8 +354,8 @@
     <string name="vs_class">vs %1$s</string>
     <string name="all_opponents">All opponents</string>
     <plurals name="history_summary">
-        <item quantity="one">%1$d game · %2$s · </item>
-        <item quantity="other">%1$d games · %2$s · </item>
+        <item quantity="one">"%1$d game · %2$s · "</item>
+        <item quantity="other">"%1$d games · %2$s · "</item>
     </plurals>
     <string name="export_csv_action">Export as CSV</string>
     <string name="csv_file_name">hs-games.csv</string>
@@ -445,8 +445,8 @@
     <string name="language_auto_pending">Follows your Hearthstone client as soon as a game is recognized. Until then: %1$s.</string>
     <string name="language_ui_note">The interface is available in English and German; for other languages cards are shown in your language and the interface in English.</string>
     <string name="cards_loaded">%1$s cards loaded</string>
-    <string name="cards_updated_at"> · updated %1$s</string>
-    <string name="cards_loading_suffix"> · loading …</string>
+    <string name="cards_updated_at">" · updated %1$s"</string>
+    <string name="cards_loading_suffix">" · loading …"</string>
     <string name="update_now">Update now</string>
     <string name="card_data_source">Source: HearthstoneJSON (hearthstonejson.com). Card images: art.hearthstonejson.com.</string>
     <string name="collection_and_dust">Collection &amp; dust costs</string>
@@ -473,7 +473,7 @@
     <string name="automatic_recognition">Automatic recognition</string>
     <string name="recognition_explained">Tap \"Play\" (home screen or long-press the app icon). Android asks once per session for screen capture – afterwards the app recognizes game start, your deck, drawn cards, your opponent\'s cards, turns and the result by itself. Text recognition runs entirely on the device, nothing is uploaded. Tip (Android 14+): choose \"A single app\" → Hearthstone.</string>
     <string name="recognition_status_active">Status: active · %1$s · %2$d frames analyzed</string>
-    <string name="recognition_status_saved"> (%1$d unchanged, text recognition skipped)</string>
+    <string name="recognition_status_saved">" (%1$d unchanged, text recognition skipped)"</string>
     <string name="recognition_status_off">Status: off</string>
     <string name="auto_record">Save games automatically</string>
     <string name="auto_record_hint">Finished games land in the match history including the turn timeline.</string>

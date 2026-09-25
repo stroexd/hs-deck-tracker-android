@@ -207,7 +207,7 @@
     <string name="edit_deck">Deck bearbeiten</string>
     <string name="save">Speichern</string>
     <string name="cards_of">%1$d/%2$d Karten</string>
-    <string name="missing_prefix">Fehlt: </string>
+    <string name="missing_prefix">"Fehlt: "</string>
     <string name="deck_with_count">Deck (%1$d)</string>
     <string name="card_search_placeholder">Karte, Text, Stamm …</string>
     <string name="all_classes">Alle Klassen</string>
@@ -236,7 +236,7 @@
     <string name="completion_of">Vollständigkeit (%1$s)</string>
     <string name="edit_dust">Staub bearbeiten</string>
     <string name="collection_counts">%1$s von %2$s Karten · %3$s/%4$s Exemplare</string>
-    <string name="disenchant_extras">Überzählige Karten entzaubern: </string>
+    <string name="disenchant_extras">"Überzählige Karten entzaubern: "</string>
     <string name="updated_at">Stand: %1$s</string>
     <string name="source_of">Quelle: %1$s</string>
     <string name="upload_file">Datei hochladen</string>
@@ -259,7 +259,7 @@
     <string name="import_unresolved">%1$d Einträge nicht erkannt: %2$s</string>
     <string name="clear_collection_title">Sammlung leeren?</string>
     <string name="clear_collection_message">Alle Karten werden aus der Sammlung entfernt (Arkanstaub bleibt erhalten).</string>
-    <string name="remaining_prefix">Rest: </string>
+    <string name="remaining_prefix">"Rest: "</string>
     <string name="supported_formats">Unterstützte Formate</string>
     <string name="supported_formats_list">• HSReplay-Sammlungs-JSON: {\"collection\": {\"&lt;dbfId&gt;\": [normal, golden, diamant, signatur]}, \"dust\": 1234}\n• JSON-Listen oder -Maps mit dbfId, Karten-ID oder Kartenname und Anzahl\n• CSV/Tabellen (Trennzeichen ; , Tab), z. B. „Name;Anzahl;Golden“\n• Freitext: eine Karte pro Zeile, z. B. „2x Feuerball“ oder „CS2_029 2“\n• Exporte dieser App (JSON/CSV)</string>
     <string name="collection_tip">Tipp: Du kannst Karten auch einzeln pflegen (Set antippen) oder bei einem Deck „Karten zur Sammlung hinzufügen“ wählen. Kernset-Karten zählen automatisch als besessen (in den Einstellungen änderbar).</string>
@@ -275,7 +275,7 @@
     <string name="own_all_cards">Alle Karten besitzen (max.)</string>
     <string name="remove_all_cards">Alle Karten entfernen</string>
     <string name="set_progress">%1$d/%2$d Karten · %3$s der Exemplare</string>
-    <string name="to_complete_prefix">Zum Vervollständigen: </string>
+    <string name="to_complete_prefix">"Zum Vervollständigen: "</string>
     <string name="set_tap_hint">Tippen: Anzahl erhöhen (0 → 1 → 2 → 0) · Lange drücken: Details</string>
     <string name="own_set_title">Ganzes Set besitzen?</string>
     <string name="clear_set_title">Set leeren?</string>
@@ -353,8 +353,8 @@
     <string name="vs_class">vs. %1$s</string>
     <string name="all_opponents">Alle Gegner</string>
     <plurals name="history_summary">
-        <item quantity="one">%1$d Partie · %2$s · </item>
-        <item quantity="other">%1$d Partien · %2$s · </item>
+        <item quantity="one">"%1$d Partie · %2$s · "</item>
+        <item quantity="other">"%1$d Partien · %2$s · "</item>
     </plurals>
     <string name="export_csv_action">Als CSV exportieren</string>
     <string name="csv_file_name">hs-partien.csv</string>
@@ -444,8 +444,8 @@
     <string name="language_auto_pending">Folgt deinem Hearthstone-Client, sobald eine Partie erkannt wurde. Bis dahin: %1$s.</string>
     <string name="language_ui_note">Die Oberfläche gibt es auf Deutsch und Englisch; bei anderen Sprachen erscheinen die Karten in deiner Sprache und die Oberfläche auf Englisch.</string>
     <string name="cards_loaded">%1$s Karten geladen</string>
-    <string name="cards_updated_at"> · Stand %1$s</string>
-    <string name="cards_loading_suffix"> · lädt …</string>
+    <string name="cards_updated_at">" · Stand %1$s"</string>
+    <string name="cards_loading_suffix">" · lädt …"</string>
     <string name="update_now">Jetzt aktualisieren</string>
     <string name="card_data_source">Quelle: HearthstoneJSON (hearthstonejson.com). Kartenbilder: art.hearthstonejson.com.</string>
     <string name="collection_and_dust">Sammlung &amp; Staubkosten</string>
@@ -472,7 +472,7 @@
     <string name="automatic_recognition">Automatische Erkennung</string>
     <string name="recognition_explained">Tippe auf „Spielen“ (Startseite oder App-Symbol lange drücken). Android fragt einmal pro Sitzung nach der Bildschirmaufnahme – danach erkennt die App selbstständig Spielstart, dein Deck, gezogene Karten, die Karten des Gegners, Züge und das Ergebnis. Die Texterkennung läuft komplett auf dem Gerät, es wird nichts hochgeladen. Tipp (Android 14+): „Einzelne App“ → Hearthstone wählen.</string>
     <string name="recognition_status_active">Status: aktiv · %1$s · %2$d Bilder ausgewertet</string>
-    <string name="recognition_status_saved"> (%1$d unverändert, Texterkennung gespart)</string>
+    <string name="recognition_status_saved">" (%1$d unverändert, Texterkennung gespart)"</string>
     <string name="recognition_status_off">Status: aus</string>
     <string name="auto_record">Partien automatisch speichern</string>
     <string name="auto_record_hint">Beendete Partien landen mit Zugverlauf in der Match-History.</string>
