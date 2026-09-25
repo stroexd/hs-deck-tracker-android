@@ -48,6 +48,10 @@ recognition, so it needs **no root, no Shizuku, no PC and no helper app**.
 - **Sync from Hearthstone:** open your collection in the game and flip through the pages – the app reads card names
   and copy counts from the screen. Filter by set in the game to sync only new cards; cards you don't flip past keep
   their count. Reprints that share a name are assigned to the free Core or Standard printing first.
+- **Packs and crafting update it automatically** while recognition is running: cards from opened packs (single
+  packs and the summary after opening many) are added and marked as new, extra copy or duplicate; crafted cards are
+  added and disenchanted ones removed, dust included. After "Disenchant Extra Cards" the overlay asks before removing
+  the extras, and every change can be undone in the overlay.
 - Or upload your collection as a file or paste it:
   - HSReplay collection JSON: `{"collection": {"<dbfId>": [normal, golden, diamond, signature]}, "dust": 1234}`
   - JSON lists or maps with dbfId, card ID (`CS2_029`) or card name and count

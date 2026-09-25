@@ -49,6 +49,11 @@ Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hil
   Anzahl vom Bildschirm. Im Spiel nach Set filtern, um nur neue Karten zu synchronisieren; Karten, an denen du nicht
   vorbeiblätterst, behalten ihre Anzahl. Nachdrucke mit gleichem Namen werden zuerst der kostenlosen Kernset- bzw.
   Standard-Version zugeordnet.
+- **Packungen und Herstellen aktualisieren sie automatisch**, solange die Erkennung läuft: Karten aus geöffneten
+  Packungen (einzeln oder die Zusammenfassung nach vielen Packungen) kommen dazu und werden als neu, weiteres Exemplar
+  oder Duplikat markiert; hergestellte Karten kommen dazu, entzauberte werden entfernt – inklusive Staub. Nach
+  „Überzählige Karten entzaubern“ fragt das Overlay nach, bevor die Extras entfernt werden, und jede Änderung lässt sich
+  im Overlay rückgängig machen.
 - Oder die Sammlung als Datei hochladen bzw. einfügen:
   - HSReplay-Sammlungs-JSON: `{"collection": {"<dbfId>": [normal, golden, diamant, signatur]}, "dust": 1234}`
   - JSON-Listen/-Maps mit dbfId, Karten-ID (`CS2_029`) oder Kartenname und Anzahl

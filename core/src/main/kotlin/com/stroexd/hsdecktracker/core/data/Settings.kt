@@ -55,6 +55,7 @@ data class AppSettings(
     val overlayShowOdds: Boolean = true,
     val overlayWidthDp: Int = 230,
     val autoRecordMatches: Boolean = true,
+    val trackCollectionChanges: Boolean = true,
     val showRecognitionDebug: Boolean = false,
     val recordDiagnostics: Boolean = false,
 ) {

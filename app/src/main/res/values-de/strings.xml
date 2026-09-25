@@ -517,4 +517,31 @@
         <item quantity="one">Sammlung aktualisiert: %1$d Karte geändert</item>
         <item quantity="other">Sammlung aktualisiert: %1$d Karten geändert</item>
     </plurals>
+    <plurals name="activity_pack">
+        <item quantity="one">%1$d Karte aus einer Packung hinzugefügt</item>
+        <item quantity="other">%1$d Karten aus Packungen hinzugefügt</item>
+    </plurals>
+    <string name="activity_new">%1$d neu</string>
+    <plurals name="activity_duplicates">
+        <item quantity="one">%1$d Duplikat</item>
+        <item quantity="other">%1$d Duplikate</item>
+    </plurals>
+    <string name="activity_card_new">★ %1$s (neu)</string>
+    <string name="activity_card_duplicate">%1$s – Duplikat (+%2$s Staub beim Entzaubern)</string>
+    <string name="activity_disenchanted">Entzaubert: %1$s</string>
+    <string name="activity_crafted">Hergestellt: %1$s</string>
+    <string name="activity_dust">%1$s Staub</string>
+    <string name="activity_mass_question">Überzählige Karten entzaubert?</string>
+    <plurals name="activity_mass_proposal">
+        <item quantity="one">Die App entfernt %1$d überzähliges Exemplar (%2$s Staub).</item>
+        <item quantity="other">Die App entfernt %1$d überzählige Exemplare (%2$s Staub).</item>
+    </plurals>
+    <plurals name="activity_mass_done">
+        <item quantity="one">%1$d überzähliges Exemplar entfernt</item>
+        <item quantity="other">%1$d überzählige Exemplare entfernt</item>
+    </plurals>
+    <string name="no">Nein</string>
+    <string name="ok">OK</string>
+    <string name="track_collection">Sammlung bei Packungen &amp; Herstellen aktualisieren</string>
+    <string name="track_collection_hint">Während die Erkennung läuft, kommen Karten aus geöffneten Packungen dazu, entzauberte werden entfernt und hergestellte hinzugefügt. Jede Änderung lässt sich im Overlay rückgängig machen.</string>
 </resources>

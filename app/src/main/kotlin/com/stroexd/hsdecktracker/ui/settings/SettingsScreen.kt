@@ -344,6 +344,12 @@ fun SettingsScreen(navController: NavHostController) {
                         onChange = { v -> update { it.copy(autoRecordMatches = v) } },
                     )
                     SwitchRow(
+                        title = stringResource(R.string.track_collection),
+                        subtitle = stringResource(R.string.track_collection_hint),
+                        checked = settings.trackCollectionChanges,
+                        onChange = { v -> update { it.copy(trackCollectionChanges = v) } },
+                    )
+                    SwitchRow(
                         title = stringResource(R.string.show_recognized_texts),
                         subtitle = stringResource(R.string.show_recognized_texts_hint),
                         checked = settings.showRecognitionDebug,

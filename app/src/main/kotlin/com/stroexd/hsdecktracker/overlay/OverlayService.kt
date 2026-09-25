@@ -39,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,9 +69,12 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.stroexd.hsdecktracker.AppContainer
+import com.stroexd.hsdecktracker.CollectionActivity
 import com.stroexd.hsdecktracker.MainActivity
 import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.appContainer
+import com.stroexd.hsdecktracker.core.collection.ReceivedStatus
+import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.core.vision.VisionGameTracker
 import com.stroexd.hsdecktracker.ui.ProvideAppLocale
 import com.stroexd.hsdecktracker.ui.labelRes
@@ -281,6 +286,10 @@ private fun OverlayContent(
     LaunchedEffect(state?.startedAt) {
         if (state != null) collapsed = false
     }
+    val activityId by remember { container.collectionActivity.map { it?.id } }.collectAsStateWithLifecycle(initialValue = null)
+    LaunchedEffect(activityId) {
+        if (activityId != null) collapsed = false
+    }
 
     val dragModifier = Modifier.pointerInput(Unit) {
         detectDragGestures { change, dragAmount ->
@@ -353,6 +362,7 @@ private fun OverlayContent(
             val scanning by remember { container.recognition.map { it.scan != null }.distinctUntilChanged() }
                 .collectAsStateWithLifecycle(initialValue = false)
             if (settings.showRecognitionDebug) RecognitionDebugLine(container)
+            if (!scanning) CollectionActivityCard(container)
             val current = state
             if (scanning) {
                 CollectionScanPanel(container)
@@ -395,6 +405,76 @@ private fun RecognitionDebugLine(container: AppContainer) {
         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
     )
 }
+
+@Composable
+private fun CollectionActivityCard(container: AppContainer) {
+    val activity by container.collectionActivity.collectAsStateWithLifecycle()
+    val current = activity ?: return
+    val cardState by container.cards.state.collectAsStateWithLifecycle()
+    fun name(id: Int) = cardState.db.byDbfId(id)?.name ?: "#$id"
+    val removed = -current.cards.sumOf { it.copies }
+    val dust = (if (current.dust > 0) "+" else "") + formatNumber(current.dust)
+    val lines: List<String> = when (current.kind) {
+        CollectionActivity.Kind.PACK -> {
+            val newCards = current.cards.count { it.status == ReceivedStatus.NEW }
+            val duplicates = current.cards.count { it.status == ReceivedStatus.DUPLICATE }
+            val summary = listOfNotNull(
+                stringResource(R.string.activity_new, newCards).takeIf { newCards > 0 },
+                pluralStringResource(R.plurals.activity_duplicates, duplicates, duplicates).takeIf { duplicates > 0 },
+            ).joinToString(" · ")
+            val shown = current.cards.sortedBy { it.status?.let { status -> PACK_ORDER.indexOf(status) } }.take(MAX_ACTIVITY_LINES)
+            listOf(pluralStringResource(R.plurals.activity_pack, current.cards.size, current.cards.size), summary) +
+                shown.map { changed ->
+                    val card = cardState.db.byDbfId(changed.dbfId)
+                    when (changed.status) {
+                        ReceivedStatus.NEW -> stringResource(R.string.activity_card_new, name(changed.dbfId))
+                        ReceivedStatus.DUPLICATE ->
+                            stringResource(R.string.activity_card_duplicate, name(changed.dbfId), formatNumber(card?.rarityType?.disenchantValue ?: 0))
+                        else -> name(changed.dbfId)
+                    }
+                } +
+                listOfNotNull((current.cards.size - shown.size).takeIf { it > 0 }?.let { stringResource(R.string.more_issues, it) })
+        }
+        CollectionActivity.Kind.DISENCHANT ->
+            listOf(stringResource(R.string.activity_disenchanted, current.cards.joinToString { name(it.dbfId) }), stringResource(R.string.activity_dust, dust))
+        CollectionActivity.Kind.CRAFT ->
+            listOf(stringResource(R.string.activity_crafted, current.cards.joinToString { name(it.dbfId) }), stringResource(R.string.activity_dust, dust))
+        CollectionActivity.Kind.MASS_DISENCHANT -> if (current.undo == null) {
+            listOf(stringResource(R.string.activity_mass_question), pluralStringResource(R.plurals.activity_mass_proposal, removed, removed, dust))
+        } else {
+            listOf(pluralStringResource(R.plurals.activity_mass_done, removed, removed), stringResource(R.string.activity_dust, dust))
+        }
+    }
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(6.dp),
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            lines.filter { it.isNotEmpty() }.forEachIndexed { i, text ->
+                Text(
+                    text,
+                    style = if (i == 0) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelSmall,
+                    fontWeight = if (i == 0) FontWeight.Bold else null,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                if (current.undo == null) {
+                    TextButton(onClick = { container.dismissCollectionActivity() }) { Text(stringResource(R.string.no)) }
+                    TextButton(onClick = { container.confirmMassDisenchant() }) { Text(stringResource(R.string.remove)) }
+                } else {
+                    TextButton(onClick = { container.undoCollectionActivity() }) { Text(stringResource(R.string.undo)) }
+                    TextButton(onClick = { container.dismissCollectionActivity() }) { Text(stringResource(R.string.ok)) }
+                }
+            }
+        }
+    }
+}
+
+private val PACK_ORDER = listOf(ReceivedStatus.NEW, ReceivedStatus.DUPLICATE, ReceivedStatus.COPY)
+private const val MAX_ACTIVITY_LINES = 6
 
 @Composable
 private fun CollectionScanPanel(container: AppContainer) {
