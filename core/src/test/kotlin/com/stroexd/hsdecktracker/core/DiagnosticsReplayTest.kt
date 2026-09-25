@@ -5,6 +5,7 @@ import com.stroexd.hsdecktracker.core.tracker.GameEvent
 import com.stroexd.hsdecktracker.core.tracker.TrackerController
 import com.stroexd.hsdecktracker.core.util.AppJson
 import com.stroexd.hsdecktracker.core.vision.CardNameIndex
+import com.stroexd.hsdecktracker.core.vision.CollectionWatcher
 import com.stroexd.hsdecktracker.core.vision.OcrFrame
 import com.stroexd.hsdecktracker.core.vision.VisionGameTracker
 import java.io.File
@@ -30,6 +31,8 @@ class DiagnosticsReplayTest {
         val out = StringBuilder()
         var frameNo = 0
         vision.decisionLog = { out.append("#$frameNo      · $it\n") }
+        val menus = CollectionWatcher(index)
+        menus.decisionLog = { out.append("#$frameNo      · menu: $it\n") }
         val t0 = frames.firstOrNull()?.timestamp ?: 0L
         fun names(ids: List<Int>) = ids.mapNotNull { db.byDbfId(it)?.name }.distinct().joinToString("/")
 
@@ -37,6 +40,10 @@ class DiagnosticsReplayTest {
             now = frame.timestamp
             frameNo = i + 1
             val events = vision.onFrame(frame)
+            // Like the app: menus are only followed outside of games
+            if (vision.phase == VisionGameTracker.Phase.IDLE || vision.phase == VisionGameTracker.Phase.ENDED) {
+                menus.onFrame(frame).forEach { out.append("#${i + 1} t=${(frame.timestamp - t0) / 1000}s  COLLECTION $it\n") }
+            }
             for (event in events) {
                 val text = when (event) {
                     is GameEvent.FriendlyCardSeen -> "OWN       ${names(event.dbfIds)}"

@@ -1,9 +1,13 @@
 package com.stroexd.hsdecktracker.core.data
 
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
+import com.stroexd.hsdecktracker.core.cards.FormatRules
 import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.core.collection.CardCollection
+import com.stroexd.hsdecktracker.core.collection.CollectionChange
 import com.stroexd.hsdecktracker.core.collection.CollectionImportResult
+import com.stroexd.hsdecktracker.core.collection.OwnedCard
+import com.stroexd.hsdecktracker.core.collection.withScannedCopies
 import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckTextParser
 import com.stroexd.hsdecktracker.core.stats.MatchRecord
@@ -51,6 +55,9 @@ class DeckRepository(dir: File, private val clock: () -> Long = System::currentT
     }
 }
 
+/** The entries before a change (null: not owned) and the dust it added. */
+data class CollectionUndo(val cards: Map<Int, OwnedCard?>, val dust: Int)
+
 class CollectionRepository(dir: File, private val clock: () -> Long = System::currentTimeMillis) {
     private val store = JsonFileStore(File(dir, "collection.json"), CardCollection.serializer(), CardCollection())
 
@@ -73,6 +80,37 @@ class CollectionRepository(dir: File, private val clock: () -> Long = System::cu
         store.update { current ->
             counts.entries.fold(current) { acc, (id, count) -> acc.withNormalCount(id, count) }.copy(updatedAt = clock())
         }
+    }
+
+    /** Applies a change computed from the current collection and returns what it takes to undo it. */
+    suspend fun apply(compute: (CardCollection) -> CollectionChange): Pair<CollectionChange, CollectionUndo> {
+        lateinit var result: Pair<CollectionChange, CollectionUndo>
+        store.update { current ->
+            val change = compute(current)
+            val ids = change.cards.mapTo(HashSet()) { it.dbfId }
+            result = change to CollectionUndo(ids.associateWith { current.cards[it] }, change.collection.dust - current.dust)
+            change.collection.copy(updatedAt = clock())
+        }
+        return result
+    }
+
+    suspend fun undo(undo: CollectionUndo) {
+        store.update { current ->
+            val cards = current.cards.toMutableMap()
+            undo.cards.forEach { (id, owned) -> if (owned == null) cards -= id else cards[id] = owned }
+            current.copy(cards = cards, dust = (current.dust - undo.dust).coerceAtLeast(0), updatedAt = clock())
+        }
+    }
+
+    /** Returns how many cards changed. */
+    suspend fun applyScan(totals: Map<List<Int>, Int>, db: CardDatabase, rules: FormatRules): Int {
+        var changed = 0
+        store.update { current ->
+            val next = current.withScannedCopies(totals, db, rules)
+            changed = (current.cards.keys + next.cards.keys).count { current.owned(it) != next.owned(it) }
+            next.copy(updatedAt = clock(), source = "Hearthstone")
+        }
+        return changed
     }
 
     suspend fun setDust(dust: Int) {

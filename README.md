@@ -19,8 +19,8 @@ recognition, so it needs **no root, no Shizuku, no PC and no helper app**.
 - **Automatic tracking** – game start, both classes, your mulligan and draws, your deck, the opponent's played
   cards, turns and the result are detected from the screen. A floating overlay shows what is left in your deck
   and what the opponent is likely playing.
-- **"Which decks can I build?"** – upload your collection once and see the missing cards and Arcane Dust cost for
-  every deck: your own, meta decks and any pasted deck code.
+- **"Which decks can I build?"** – sync your collection straight from Hearthstone and see the missing cards and
+  Arcane Dust cost for every deck: your own, meta decks and any pasted deck code.
 - **Meta decks** from HSReplay.net with win rates, filterable by rank range and time frame, sortable by dust cost.
 - **Match history & stats** – every game with its turn-by-turn timeline, matchups, streaks, going first vs. coin.
 - **Speaks your game's language** – the app and the card data follow the language of your Hearthstone client.
@@ -45,7 +45,14 @@ recognition, so it needs **no root, no Shizuku, no PC and no helper app**.
   "Display over other apps".
 
 ### Collection & crafting
-- Upload your collection as a file or paste it:
+- **Sync from Hearthstone:** open your collection in the game and flip through the pages – the app reads card names
+  and copy counts from the screen. Filter by set in the game to sync only new cards; cards you don't flip past keep
+  their count. Reprints that share a name are assigned to the free Core or Standard printing first.
+- **Packs and crafting update it automatically** while recognition is running: cards from opened packs (single
+  packs and the summary after opening many) are added and marked as new, extra copy or duplicate; crafted cards are
+  added and disenchanted ones removed, dust included. After "Disenchant Extra Cards" the overlay asks before removing
+  the extras, and every change can be undone in the overlay.
+- Or upload your collection as a file or paste it:
   - HSReplay collection JSON: `{"collection": {"<dbfId>": [normal, golden, diamond, signature]}, "dust": 1234}`
   - JSON lists or maps with dbfId, card ID (`CS2_029`) or card name and count
   - CSV / tables with or without a header (`Name;Count;Golden`, `dbfId,count,golden`, …)

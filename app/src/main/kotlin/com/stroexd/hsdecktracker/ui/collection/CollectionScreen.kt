@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,12 +61,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import com.stroexd.hsdecktracker.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import com.stroexd.hsdecktracker.R
+import com.stroexd.hsdecktracker.ScanProgress
 import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.collection.CollectionExporter
 import com.stroexd.hsdecktracker.core.collection.CollectionImportException
@@ -80,18 +82,19 @@ import com.stroexd.hsdecktracker.core.meta.MetaCardStats
 import com.stroexd.hsdecktracker.core.meta.MetaDeck
 import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.core.util.formatPercent
+import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
-import com.stroexd.hsdecktracker.ui.message
 import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.CardTile
 import com.stroexd.hsdecktracker.ui.components.ChipRow
-import com.stroexd.hsdecktracker.ui.components.CollectionCardDialog
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
+import com.stroexd.hsdecktracker.ui.components.CollectionCardDialog
 import com.stroexd.hsdecktracker.ui.components.ConfirmDialog
 import com.stroexd.hsdecktracker.ui.components.CraftCostLabel
 import com.stroexd.hsdecktracker.ui.components.DustLabel
 import com.stroexd.hsdecktracker.ui.components.SectionHeader
 import com.stroexd.hsdecktracker.ui.formatDateTime
+import com.stroexd.hsdecktracker.ui.message
 import com.stroexd.hsdecktracker.ui.navigateTopLevel
 import com.stroexd.hsdecktracker.ui.readClipboardText
 import com.stroexd.hsdecktracker.ui.readText
@@ -112,6 +115,8 @@ fun CollectionScreen(navController: NavHostController) {
     val cardState by container.cards.state.collectAsStateWithLifecycle()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val metaState by container.meta.state.collectAsStateWithLifecycle()
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    val startScan = rememberTrackingStarter()
     val db = cardState.db
 
     var setScope by rememberSaveable { mutableStateOf(SetScope.STANDARD) }
@@ -249,7 +254,15 @@ fun CollectionScreen(navController: NavHostController) {
                             )
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Button(onClick = { openFile.launch(arrayOf("*/*")) }) {
+                            Button(onClick = {
+                                container.startCollectionScan()
+                                startScan()
+                            }) {
+                                Icon(Icons.Filled.Sync, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.scan_collection))
+                            }
+                            FilledTonalButton(onClick = { openFile.launch(arrayOf("*/*")) }) {
                                 Icon(Icons.Filled.FileUpload, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
                                 Text(stringResource(R.string.upload_file))
@@ -282,7 +295,25 @@ fun CollectionScreen(navController: NavHostController) {
                                 TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.clear)) }
                             }
                         }
+                        Text(
+                            stringResource(if (collection.isEmpty) R.string.scan_collection_hint else R.string.scan_tip),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
+                }
+            }
+            recognition.scan?.let { scan ->
+                item {
+                    ScanRunningCard(
+                        scan,
+                        onSave = {
+                            container.finishCollectionScan(save = true) { changed ->
+                                scope.launch { snackbar.showSnackbar(context.resources.getQuantityString(R.plurals.scan_saved, changed, changed)) }
+                            }
+                        },
+                        onCancel = { container.finishCollectionScan(save = false) },
+                    )
                 }
             }
             if (collection.isEmpty) {
@@ -497,4 +528,21 @@ private fun DustDialog(current: Int, onDismiss: () -> Unit, onSave: (Int) -> Uni
         confirmButton = { Button(onClick = { onSave(text.toIntOrNull() ?: 0) }) { Text(stringResource(R.string.save)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
+}
+
+@Composable
+private fun ScanRunningCard(scan: ScanProgress, onSave: () -> Unit, onCancel: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.scan_running), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.scan_progress, scan.pages, scan.cards, scan.copies), style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onSave, enabled = scan.cards > 0) { Text(stringResource(R.string.save)) }
+                OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+            }
+        }
+    }
 }

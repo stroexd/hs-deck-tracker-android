@@ -19,8 +19,8 @@ Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hil
 - **Automatisches Tracking** – Spielstart, beide Klassen, Mulligan und gezogene Karten, dein Deck, die gespielten
   Karten des Gegners, Züge und Ergebnis werden am Bildschirm erkannt. Ein Overlay zeigt, was noch im Deck ist und
   welches Deck der Gegner vermutlich spielt.
-- **„Welche Decks kann ich bauen?“** – Sammlung einmal hochladen und für jedes Deck fehlende Karten und
-  Arkanstaub-Kosten sehen: eigene Decks, Meta-Decks und beliebige Deck-Codes.
+- **„Welche Decks kann ich bauen?“** – Sammlung direkt aus Hearthstone synchronisieren und für jedes Deck fehlende
+  Karten und Arkanstaub-Kosten sehen: eigene Decks, Meta-Decks und beliebige Deck-Codes.
 - **Meta-Decks** von HSReplay.net mit Siegquoten, filterbar nach Rangbereich und Zeitraum, sortierbar nach Staubkosten.
 - **Match-History & Statistik** – jede Partie mit Zugverlauf, Matchups, Serien, am Zug vs. Münze.
 - **Spricht die Sprache deines Spiels** – App und Kartendaten folgen der Sprache deines Hearthstone-Clients.
@@ -45,7 +45,16 @@ Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hil
   „Über anderen Apps einblenden“.
 
 ### Sammlung & Herstellen
-- Sammlung als Datei hochladen oder einfügen:
+- **Aus Hearthstone synchronisieren:** Sammlung im Spiel öffnen und durchblättern – die App liest Kartennamen und
+  Anzahl vom Bildschirm. Im Spiel nach Set filtern, um nur neue Karten zu synchronisieren; Karten, an denen du nicht
+  vorbeiblätterst, behalten ihre Anzahl. Nachdrucke mit gleichem Namen werden zuerst der kostenlosen Kernset- bzw.
+  Standard-Version zugeordnet.
+- **Packungen und Herstellen aktualisieren sie automatisch**, solange die Erkennung läuft: Karten aus geöffneten
+  Packungen (einzeln oder die Zusammenfassung nach vielen Packungen) kommen dazu und werden als neu, weiteres Exemplar
+  oder Duplikat markiert; hergestellte Karten kommen dazu, entzauberte werden entfernt – inklusive Staub. Nach
+  „Überzählige Karten entzaubern“ fragt das Overlay nach, bevor die Extras entfernt werden, und jede Änderung lässt sich
+  im Overlay rückgängig machen.
+- Oder die Sammlung als Datei hochladen bzw. einfügen:
   - HSReplay-Sammlungs-JSON: `{"collection": {"<dbfId>": [normal, golden, diamant, signatur]}, "dust": 1234}`
   - JSON-Listen/-Maps mit dbfId, Karten-ID (`CS2_029`) oder Kartenname und Anzahl
   - CSV/Tabellen mit oder ohne Kopfzeile (`Name;Anzahl;Golden`, `dbfId,count,golden` …)

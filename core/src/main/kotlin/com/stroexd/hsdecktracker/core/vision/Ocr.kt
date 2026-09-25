@@ -23,6 +23,18 @@ data class OcrLine(
     val height: Float get() = bottom - top
 }
 
+/** Card names stand alone on their banner; a line right below other text belongs to a card text. */
+internal fun OcrLine.continuesText(lines: List<OcrLine>): Boolean {
+    val h = max(height, 0.01f)
+    return lines.any { other ->
+        other !== this &&
+            other.bottom <= top + 0.5f * h &&
+            other.bottom >= top - 1.2f * h &&
+            min(other.right, right) > max(other.left, left) &&
+            other.text.count { it.isLetter() } >= 3
+    }
+}
+
 @Serializable
 data class OcrFrame(
     @SerialName("ts") val timestamp: Long,

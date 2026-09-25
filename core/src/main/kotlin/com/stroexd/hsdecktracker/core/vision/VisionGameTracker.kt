@@ -257,7 +257,7 @@ class VisionGameTracker(
         }
         val preferred by lazy(LazyThreadSafetyMode.NONE) { contextProvider() }
         for (line in nameCandidates) {
-            if (isTextContinuation(line, lines)) continue
+            if (line.continuesText(lines)) continue
             // Hero name above the class on the versus screen ("Broxigar" is also a card)
             if (labels.any { isDirectlyAbove(line, it) }) continue
             val match = index.match(line.text, preferred) ?: continue
@@ -283,18 +283,6 @@ class VisionGameTracker(
     private fun isDirectlyAbove(line: OcrLine, below: OcrLine): Boolean =
         below.top - line.bottom in -0.01f..(1.5f * max(line.height, below.height)) &&
             min(line.right, below.right) > max(line.left, below.left)
-
-    /** Card names stand alone on their banner; a line right below other text belongs to a card text. */
-    private fun isTextContinuation(line: OcrLine, lines: List<OcrLine>): Boolean {
-        val h = max(line.height, 0.01f)
-        return lines.any { other ->
-            other !== line &&
-                other.bottom <= line.top + 0.5f * h &&
-                other.bottom >= line.top - 1.2f * h &&
-                min(other.right, line.right) > max(other.left, line.left) &&
-                other.text.count { it.isLetter() } >= 3
-        }
-    }
 
     /** Several enlarged cards side by side: a choice (Discover) or the mulligan. */
     private fun isCardRow(cards: List<CardLine>): Boolean {

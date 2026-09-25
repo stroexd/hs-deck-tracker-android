@@ -4,8 +4,13 @@ import android.content.Context
 import android.content.res.Resources
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
 import com.stroexd.hsdecktracker.core.cards.GameFormat
+import com.stroexd.hsdecktracker.core.collection.CardCollection
+import com.stroexd.hsdecktracker.core.collection.ChangedCard
+import com.stroexd.hsdecktracker.core.collection.CollectionChange
+import com.stroexd.hsdecktracker.core.collection.CollectionChanges
 import com.stroexd.hsdecktracker.core.data.CardRepository
 import com.stroexd.hsdecktracker.core.data.CollectionRepository
+import com.stroexd.hsdecktracker.core.data.CollectionUndo
 import com.stroexd.hsdecktracker.core.data.DeckRepository
 import com.stroexd.hsdecktracker.core.data.GameLocales
 import com.stroexd.hsdecktracker.core.data.HttpClient
@@ -22,6 +27,9 @@ import com.stroexd.hsdecktracker.core.tracker.GameEvent
 import com.stroexd.hsdecktracker.core.tracker.TrackerController
 import com.stroexd.hsdecktracker.core.tracker.TrackerState
 import com.stroexd.hsdecktracker.core.vision.CardNameIndex
+import com.stroexd.hsdecktracker.core.vision.CollectionEvent
+import com.stroexd.hsdecktracker.core.vision.CollectionScanner
+import com.stroexd.hsdecktracker.core.vision.CollectionWatcher
 import com.stroexd.hsdecktracker.core.vision.OcrFrame
 import com.stroexd.hsdecktracker.core.vision.VisionGameTracker
 import com.stroexd.hsdecktracker.vision.CapturePacing
@@ -36,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.Locale
@@ -48,7 +57,28 @@ data class RecognitionStatus(
     val frames: Int = 0,
     /** Frames that needed text recognition; the others were unchanged and reused the last result. */
     val ocrFrames: Int = 0,
+    /** Set while the collection is read from Hearthstone instead of tracking games. */
+    val scan: ScanProgress? = null,
 )
+
+data class ScanProgress(
+    val pages: Int = 0,
+    val cards: Int = 0,
+    val copies: Int = 0,
+    val lastPage: List<String> = emptyList(),
+)
+
+/** The latest change the app made to the collection on its own, shown in the overlay. */
+data class CollectionActivity(
+    val id: Long,
+    val kind: Kind,
+    val cards: List<ChangedCard>,
+    val dust: Int,
+    /** Null while the change is only proposed (mass disenchant). */
+    val undo: CollectionUndo?,
+) {
+    enum class Kind { PACK, DISENCHANT, CRAFT, MASS_DISENCHANT }
+}
 
 class AppContainer(context: Context) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -79,12 +109,19 @@ class AppContainer(context: Context) {
         .map(::toLocale)
         .stateIn(appScope, SharingStarted.Eagerly, toLocale(gameLocale.value))
 
+    private val _collectionActivity = MutableStateFlow<CollectionActivity?>(null)
+    val collectionActivity: StateFlow<CollectionActivity?> = _collectionActivity.asStateFlow()
+
     private val _recognition = MutableStateFlow(RecognitionStatus())
     val recognition: StateFlow<RecognitionStatus> = _recognition.asStateFlow()
 
     private var nameIndex: CardNameIndex? = null
     private var nameIndexSources: Pair<CardDatabase, CardDatabase>? = null
     private var visionTracker: VisionGameTracker? = null
+
+    @Volatile
+    private var collectionScanner: CollectionScanner? = null
+    private var collectionWatcher: CollectionWatcher? = null
     private var frameCount = 0
     private var ocrFrameCount = 0
 
@@ -144,29 +181,55 @@ class AppContainer(context: Context) {
         visionTracker = null
         frameCount = 0
         ocrFrameCount = 0
-        _recognition.value = RecognitionStatus(active = true)
+        _recognition.value = RecognitionStatus(active = true, scan = _recognition.value.scan)
         appScope.launch { meta.refresh(GameFormat.STANDARD, settings.value, cards.db) }
     }
 
     fun onRecognitionStopped() {
         visionTracker = null
-        _recognition.update { it.copy(active = false, phase = VisionGameTracker.Phase.IDLE) }
+        collectionScanner = null
+        _recognition.update { it.copy(active = false, phase = VisionGameTracker.Phase.IDLE, scan = null) }
+    }
+
+    fun startCollectionScan() {
+        collectionScanner = null
+        _recognition.update { it.copy(scan = ScanProgress()) }
+    }
+
+    fun finishCollectionScan(save: Boolean, onSaved: (changedCards: Int) -> Unit = {}) {
+        val scanner = collectionScanner
+        collectionScanner = null
+        _recognition.update { it.copy(scan = null) }
+        if (!save || scanner == null) return
+        val totals = synchronized(scanner) { scanner.totals() }
+        appScope.launch {
+            val changed = collection.applyScan(totals, cards.db, settings.value.formatRules)
+            withContext(Dispatchers.Main) { onSaved(changed) }
+        }
     }
 
     /** Outside of a game the versus screen stays long enough for a slower pace. */
-    fun capturePacing(): CapturePacing = when (_recognition.value.phase) {
-        VisionGameTracker.Phase.PLAYING -> CapturePacing(intervalMillis = 500, maxReuseMillis = 1_500)
-        VisionGameTracker.Phase.MULLIGAN -> CapturePacing(intervalMillis = 600, maxReuseMillis = 1_500)
-        VisionGameTracker.Phase.IDLE, VisionGameTracker.Phase.ENDED -> CapturePacing(intervalMillis = 1_500, maxReuseMillis = 4_000)
+    fun capturePacing(): CapturePacing {
+        if (_recognition.value.scan != null) return CapturePacing(intervalMillis = 400, maxReuseMillis = 1_000)
+        return when (_recognition.value.phase) {
+            VisionGameTracker.Phase.PLAYING -> CapturePacing(intervalMillis = 500, maxReuseMillis = 1_500)
+            VisionGameTracker.Phase.MULLIGAN -> CapturePacing(intervalMillis = 600, maxReuseMillis = 1_500)
+            VisionGameTracker.Phase.IDLE, VisionGameTracker.Phase.ENDED -> CapturePacing(intervalMillis = 1_500, maxReuseMillis = 4_000)
+        }
     }
 
     /** Always called from the same background thread. */
     fun onScreenFrame(frame: OcrFrame, notes: MutableList<String>? = null, reused: Boolean = false): List<GameEvent> {
         val index = currentNameIndex() ?: return emptyList()
+        if (_recognition.value.scan != null) {
+            scanFrame(index, frame, notes)
+            return emptyList()
+        }
         val vision = visionTracker ?: VisionGameTracker(index, contextProvider = ::recognitionContext).also { visionTracker = it }
         vision.decisionLog = notes?.let { list -> { note: String -> list += note } }
         val events = vision.onFrame(frame)
         events.forEach { onGameEvent(it) }
+        if (vision.phase == VisionGameTracker.Phase.IDLE || vision.phase == VisionGameTracker.Phase.ENDED) watchMenus(index, frame, notes)
         followClientLanguage(vision.gameLocale)
         frameCount++
         if (!reused) ocrFrameCount++
@@ -182,6 +245,75 @@ class AppContainer(context: Context) {
             )
         }
         return events
+    }
+
+    private fun watchMenus(index: CardNameIndex, frame: OcrFrame, notes: MutableList<String>?) {
+        if (!settings.value.trackCollectionChanges) return
+        val watcher = collectionWatcher ?: CollectionWatcher(index).also { collectionWatcher = it }
+        watcher.decisionLog = notes?.let { list -> { note: String -> list += "menu: $note" } }
+        watcher.onFrame(frame).forEach { event -> appScope.launch { applyCollectionEvent(event) } }
+    }
+
+    private suspend fun applyCollectionEvent(event: CollectionEvent) {
+        val db = cards.db
+        val (kind, compute) = when (event) {
+            is CollectionEvent.CardsReceived ->
+                CollectionActivity.Kind.PACK to { c: CardCollection -> CollectionChanges.receive(c, event.copies, db) }
+            is CollectionEvent.Disenchanted ->
+                CollectionActivity.Kind.DISENCHANT to { c: CardCollection -> CollectionChanges.disenchant(c, event.dbfIds, event.copies, db) }
+            is CollectionEvent.Crafted -> CollectionActivity.Kind.CRAFT to { c: CardCollection ->
+                CollectionChanges.craft(c, event.dbfIds, event.copies, db, settings.value.formatRules)
+            }
+            CollectionEvent.MassDisenchantClosed -> {
+                // Hearthstone doesn't show whether it was confirmed, so the overlay asks
+                val proposal = CollectionChanges.withoutExtras(collection.collection.value, db)
+                if (!proposal.isEmpty) showActivity(CollectionActivity.Kind.MASS_DISENCHANT, proposal, undo = null)
+                return
+            }
+        }
+        val (change, undo) = collection.apply(compute)
+        if (!change.isEmpty) showActivity(kind, change, undo)
+    }
+
+    private fun showActivity(kind: CollectionActivity.Kind, change: CollectionChange, undo: CollectionUndo?) {
+        _collectionActivity.value = CollectionActivity(System.currentTimeMillis(), kind, change.cards, change.dust, undo)
+    }
+
+    fun confirmMassDisenchant() {
+        _collectionActivity.value = null
+        appScope.launch {
+            val (change, undo) = collection.apply { CollectionChanges.withoutExtras(it, cards.db) }
+            if (!change.isEmpty) showActivity(CollectionActivity.Kind.MASS_DISENCHANT, change, undo)
+        }
+    }
+
+    fun undoCollectionActivity() {
+        val undo = _collectionActivity.value?.undo
+        _collectionActivity.value = null
+        if (undo != null) appScope.launch { collection.undo(undo) }
+    }
+
+    fun dismissCollectionActivity() {
+        _collectionActivity.value = null
+    }
+
+    private fun scanFrame(index: CardNameIndex, frame: OcrFrame, notes: MutableList<String>?) {
+        val scanner = collectionScanner ?: CollectionScanner(index).also { collectionScanner = it }
+        val progress = synchronized(scanner) {
+            scanner.decisionLog = notes?.let { list -> { note: String -> list += note } }
+            if (!scanner.onFrame(frame)) return
+            val totals = scanner.totals()
+            ScanProgress(
+                pages = scanner.pageCount,
+                cards = totals.size,
+                copies = totals.values.sum(),
+                lastPage = scanner.lastPage.map { tile ->
+                    val name = cards.db.byDbfId(tile.dbfIds.first())?.name ?: tile.name
+                    if (tile.copies > 1) "$name ×${tile.copies}" else name
+                },
+            )
+        }
+        _recognition.update { status -> if (status.scan != null) status.copy(scan = progress) else status }
     }
 
     private fun followClientLanguage(detected: String?) {
@@ -211,6 +343,7 @@ class AppContainer(context: Context) {
             )
             nameIndexSources = sources
             visionTracker = null
+            collectionWatcher = null
         }
         return nameIndex
     }
