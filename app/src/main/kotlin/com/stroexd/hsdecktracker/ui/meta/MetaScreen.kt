@@ -66,7 +66,7 @@ import com.stroexd.hsdecktracker.core.deck.DeckAnalysis
 import com.stroexd.hsdecktracker.core.meta.MetaDeck
 import com.stroexd.hsdecktracker.core.util.formatNumber
 import com.stroexd.hsdecktracker.core.util.formatPercent
-import com.stroexd.hsdecktracker.overlay.rememberOverlayStarter
+import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.Banner
@@ -300,7 +300,7 @@ fun MetaDeckDetailScreen(navController: NavHostController, format: GameFormat, d
     val collection by container.collection.collection.collectAsStateWithLifecycle()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val metaDeck = metaState.snapshots[format]?.decks?.firstOrNull { it.id == deckId }
-    val startOverlay = rememberOverlayStarter()
+    val startOverlay = rememberTrackingStarter()
     var selectedCard by remember { mutableStateOf<Card?>(null) }
 
     Scaffold(

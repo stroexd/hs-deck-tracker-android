@@ -5,6 +5,7 @@ import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.stats.MatchRecord
 import com.stroexd.hsdecktracker.core.stats.MatchResult
+import com.stroexd.hsdecktracker.core.stats.TimelineType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +21,15 @@ class TrackerController(private val clock: () -> Long = System::currentTimeMilli
     val state: StateFlow<TrackerState?> = _state.asStateFlow()
 
     private var selectedDeck: Deck? = null
+
+    /** Kandidaten für die automatische Deck-Erkennung (Priorität: Reihenfolge der Liste). */
+    var deckCandidates: () -> List<Deck> = { emptyList() }
+
+    /** dbfIds, die für Gegnerkarten bevorzugt werden (z. B. Karten aus Meta-Decks). */
+    var preferredOpponentIds: () -> Set<Int> = { emptySet() }
+
+    /** Von der Bilderkennung gesehene eigene Karten dieser Partie: Zug → mögliche dbfIds. */
+    private val visionSeen = mutableListOf<Pair<Int, List<Int>>>()
 
     fun start(deck: Deck) {
         selectedDeck = deck
@@ -46,16 +56,16 @@ class TrackerController(private val clock: () -> Long = System::currentTimeMilli
     }
 
     /**
-     * Verarbeitet ein Ereignis aus dem Hearthstone-Log.
+     * Verarbeitet ein Spielereignis (aus der Bilderkennung oder dem Hearthstone-Log).
      * @return eine abgeschlossene Partie, wenn [recordResults] aktiv ist und das Spiel endete.
      */
-    fun onLogEvent(event: GameEvent, db: CardDatabase, recordResults: Boolean = true): MatchRecord? {
+    fun onGameEvent(event: GameEvent, db: CardDatabase, recordResults: Boolean = true): MatchRecord? {
         when (event) {
             GameEvent.GameStarted -> {
                 val now = clock()
-                val base = _state.value?.resetForNewGame(now)
-                    ?: selectedDeck?.let { TrackerState.start(it, now) }
-                    ?: TrackerState.empty(now)
+                visionSeen.clear()
+                // Ohne fest gewähltes Deck wird das Deck jede Partie neu erkannt.
+                val base = selectedDeck?.let { TrackerState.start(it, now) } ?: TrackerState.empty(now)
                 _state.value = base.copy(autoTracked = true)
             }
             is GameEvent.FormatDetected -> update { if (it.deckId == null) it.copy(format = event.format) else it }
@@ -89,8 +99,77 @@ class TrackerController(private val clock: () -> Long = System::currentTimeMilli
                 if (!recordResults) return null
                 return finishGame(result)
             }
+            is GameEvent.FriendlyCardSeen -> onFriendlyCardSeen(event.dbfIds, db)
+            is GameEvent.OpponentCardSeen -> {
+                if (event.dbfIds.isEmpty()) return null
+                val preferred = preferredOpponentIds()
+                val id = event.dbfIds.firstOrNull { it in preferred } ?: event.dbfIds.first()
+                update { state ->
+                    val updated = state.addOpponentCard(id)
+                    val cls = db.byDbfId(id)?.hsClass
+                    if (state.opponentClass == HsClass.UNKNOWN && cls != null && cls.isPlayable) updated.withOpponentClass(cls) else updated
+                }
+            }
         }
         return null
+    }
+
+    /**
+     * Eigene Karte aus der Bilderkennung: dem Deck zuordnen oder – solange das Deck unbekannt ist –
+     * das Deck anhand aller bisher gesehenen Karten erkennen (eigene Decks, dann Meta-Decks).
+     */
+    private fun onFriendlyCardSeen(candidates: List<Int>, db: CardDatabase) {
+        val current = _state.value ?: return
+        if (candidates.isEmpty()) return
+        visionSeen += current.turn to candidates
+        val seen = visionSeen.map { it.second }
+        val deckKnown = current.deckCards.isNotEmpty()
+        // Passt das (evtl. vorher gewählte) Deck offensichtlich nicht, wird neu erkannt.
+        val mismatch = deckKnown && seen.size >= 3 &&
+            DeckIdentifier.score(Deck(name = "", heroClass = current.playerClass, cards = current.deckCards), seen).matched * 2 < seen.size
+        if (!deckKnown || mismatch) {
+            val identified = DeckIdentifier.identify(seen, deckCandidates())
+            if (identified != null && identified.cards != current.deckCards) {
+                if (mismatch) selectedDeck = null
+                _state.value = rebuildWithDeck(current, identified, db)
+                return
+            }
+        }
+        update { state ->
+            val id = candidates.firstOrNull { state.remainingOf(it) > 0 }
+            if (id != null) {
+                state.draw(id)
+            } else {
+                val card = db.byDbfId(candidates.first())
+                val withExtra = state.addExtraDraw(card?.id ?: candidates.first().toString())
+                val cls = card?.hsClass
+                if (state.playerClass == HsClass.UNKNOWN && cls != null && cls.isPlayable) withExtra.copy(playerClass = cls) else withExtra
+            }
+        }
+    }
+
+    /** Setzt das erkannte Deck für die laufende Partie und spielt die bisher gesehenen Karten nach. */
+    private fun rebuildWithDeck(current: TrackerState, deck: Deck, db: CardDatabase): TrackerState {
+        var state = TrackerState.start(deck, current.startedAt).copy(
+            autoTracked = current.autoTracked,
+            opponentClass = current.opponentClass,
+            opponentCards = current.opponentCards,
+            wentFirst = current.wentFirst,
+            timeline = current.timeline.filter { it.type == TimelineType.OPPONENT_PLAY },
+        )
+        for ((turn, candidates) in visionSeen) {
+            state = state.copy(turn = turn)
+            val id = candidates.firstOrNull { state.remainingOf(it) > 0 }
+            state = if (id != null) state.draw(id) else state.addExtraDraw(db.byDbfId(candidates.first())?.id ?: candidates.first().toString())
+        }
+        return state.copy(turn = current.turn)
+    }
+
+    /** Deck für die laufende Partie manuell festlegen (bereits gesehene Karten werden übernommen). */
+    fun selectDeckForCurrentGame(deck: Deck, db: CardDatabase) {
+        selectedDeck = deck
+        val current = _state.value
+        _state.value = if (current == null) TrackerState.start(deck, clock()) else rebuildWithDeck(current, deck, db)
     }
 
     /** Übernimmt das in Hearthstone gewählte Deck (aus `Decks.log`). */

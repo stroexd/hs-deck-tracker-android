@@ -11,6 +11,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.stroexd.hsdecktracker.ui.HsTrackerApp
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.theme.HsTheme
@@ -20,6 +23,7 @@ class MainActivity : ComponentActivity() {
     /** Per „Teilen“ empfangener Text (z. B. ein Deck-Code aus dem Browser). */
     private var sharedText by mutableStateOf<String?>(null)
     private var openTracker by mutableStateOf(false)
+    private var playRequested by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -28,6 +32,7 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         handleIntent(intent)
+        publishPlayShortcut()
         val container = appContainer
         setContent {
             HsTheme {
@@ -37,6 +42,8 @@ class MainActivity : ComponentActivity() {
                         onSharedTextHandled = { sharedText = null },
                         openTracker = openTracker,
                         onTrackerOpened = { openTracker = false },
+                        playRequested = playRequested,
+                        onPlayHandled = { playRequested = false },
                     )
                 }
             }
@@ -56,9 +63,24 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(EXTRA_OPEN_TRACKER, false)) {
             openTracker = true
         }
+        if (intent.action == ACTION_PLAY) {
+            playRequested = true
+        }
+    }
+
+    /** Kurzbefehl am App-Symbol: „Spielen & tracken“. */
+    private fun publishPlayShortcut() {
+        val shortcut = ShortcutInfoCompat.Builder(this, "play")
+            .setShortLabel("Spielen & tracken")
+            .setLongLabel("Hearthstone mit Tracker starten")
+            .setIcon(IconCompat.createWithResource(this, R.drawable.ic_shortcut_play))
+            .setIntent(Intent(this, MainActivity::class.java).setAction(ACTION_PLAY))
+            .build()
+        runCatching { ShortcutManagerCompat.pushDynamicShortcut(this, shortcut) }
     }
 
     companion object {
         const val EXTRA_OPEN_TRACKER = "open_tracker"
+        const val ACTION_PLAY = "com.stroexd.hsdecktracker.PLAY"
     }
 }

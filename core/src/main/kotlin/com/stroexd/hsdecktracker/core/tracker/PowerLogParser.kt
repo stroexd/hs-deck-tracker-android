@@ -4,7 +4,7 @@ import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.deck.DeckCode
 import com.stroexd.hsdecktracker.core.stats.MatchResult
 
-/** Ereignisse, die aus dem Hearthstone-`Power.log` erkannt werden. */
+/** Ereignisse einer Partie – aus dem Hearthstone-`Power.log` oder aus der Bilderkennung. */
 sealed interface GameEvent {
     data object GameStarted : GameEvent
     data class FormatDetected(val format: GameFormat) : GameEvent
@@ -17,6 +17,12 @@ sealed interface GameEvent {
     data class TurnChanged(val turn: Int) : GameEvent
     data class TurnOrderDetected(val friendlyWentFirst: Boolean) : GameEvent
     data class GameEnded(val result: MatchResult?) : GameEvent
+
+    /** Bilderkennung: eigene Karte gezogen (mögliche dbfIds, z. B. Kernset- und Legacy-Druck). */
+    data class FriendlyCardSeen(val dbfIds: List<Int>) : GameEvent
+
+    /** Bilderkennung: Karte vom Gegner gespielt (mögliche dbfIds). */
+    data class OpponentCardSeen(val dbfIds: List<Int>) : GameEvent
 }
 
 /**

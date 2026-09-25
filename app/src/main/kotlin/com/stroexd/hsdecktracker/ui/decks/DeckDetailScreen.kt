@@ -68,7 +68,7 @@ import com.stroexd.hsdecktracker.core.deck.DeckSummary
 import com.stroexd.hsdecktracker.core.stats.MatchRecord
 import com.stroexd.hsdecktracker.core.stats.StatsCalculator
 import com.stroexd.hsdecktracker.core.util.formatPercent
-import com.stroexd.hsdecktracker.overlay.rememberOverlayStarter
+import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
@@ -98,7 +98,7 @@ fun DeckDetailScreen(navController: NavHostController, deckId: String) {
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val matches by container.matches.matches.collectAsStateWithLifecycle()
     val deck = decks.firstOrNull { it.id == deckId }
-    val startOverlay = rememberOverlayStarter()
+    val startOverlay = rememberTrackingStarter()
 
     var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }

@@ -1,22 +1,35 @@
 package com.stroexd.hsdecktracker.overlay
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.stroexd.hsdecktracker.appContainer
 import com.stroexd.hsdecktracker.ui.toast
 
 object OverlayLauncher {
     const val HEARTHSTONE_PACKAGE = "com.blizzard.wtcg.hearthstone"
+    const val EXTRA_RESULT_CODE = "capture_result_code"
+    const val EXTRA_RESULT_DATA = "capture_result_data"
 
     fun canDrawOverlays(context: Context): Boolean = Settings.canDrawOverlays(context)
 
@@ -26,8 +39,17 @@ object OverlayLauncher {
         context.startActivity(intent)
     }
 
+    /** Overlay ohne Bildschirmerkennung (manuelles Tracking). */
     fun start(context: Context) {
         ContextCompat.startForegroundService(context, Intent(context, OverlayService::class.java))
+    }
+
+    /** Overlay mit automatischer Bildschirmerkennung (nach Zustimmung zur Bildschirmaufnahme). */
+    fun startWithCapture(context: Context, resultCode: Int, data: Intent) {
+        val intent = Intent(context, OverlayService::class.java)
+            .putExtra(EXTRA_RESULT_CODE, resultCode)
+            .putExtra(EXTRA_RESULT_DATA, data)
+        ContextCompat.startForegroundService(context, intent)
     }
 
     fun stop(context: Context) {
@@ -43,26 +65,76 @@ object OverlayLauncher {
 }
 
 /**
- * Liefert eine Funktion, die das Overlay startet und dabei fehlende Berechtigungen anfragt
- * („Über anderen Apps einblenden“, ab Android 13 Benachrichtigungen).
+ * „Spielen & tracken“: holt fehlende Berechtigungen ein (einmalig „Über anderen Apps einblenden“,
+ * ab Android 13 Benachrichtigungen), fragt nach der Bildschirmaufnahme, startet Overlay + Erkennung
+ * und öffnet Hearthstone. Danach läuft alles automatisch.
  */
 @Composable
-fun rememberOverlayStarter(): () -> Unit {
+fun rememberTrackingStarter(launchGame: Boolean = true): () -> Unit {
     val context = LocalContext.current
-    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        OverlayLauncher.start(context)
+    val currentLaunchGame by rememberUpdatedState(launchGame)
+    var waitingForOverlayPermission by remember { mutableStateOf(false) }
+
+    val captureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        if (result.resultCode == Activity.RESULT_OK && data != null) {
+            OverlayLauncher.startWithCapture(context, result.resultCode, data)
+        } else {
+            context.toast("Ohne Bildschirmaufnahme keine automatische Erkennung – Karten können im Overlay angetippt werden.")
+            OverlayLauncher.start(context)
+        }
+        if (currentLaunchGame && !OverlayLauncher.launchHearthstone(context)) {
+            context.toast("Hearthstone ist nicht installiert")
+        }
     }
-    return remember(context, notificationLauncher) {
+    val requestCapture: () -> Unit = remember(context, captureLauncher) {
         {
-            when {
-                !OverlayLauncher.canDrawOverlays(context) -> {
-                    context.toast("Bitte „Über anderen Apps einblenden“ erlauben und das Overlay danach erneut starten.")
-                    OverlayLauncher.requestOverlayPermission(context)
-                }
-                Build.VERSION.SDK_INT >= 33 &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED ->
-                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                else -> OverlayLauncher.start(context)
+            if (context.appContainer.recognition.value.active) {
+                // Erkennung läuft bereits – nur noch das Spiel öffnen
+                OverlayLauncher.start(context)
+                if (currentLaunchGame) OverlayLauncher.launchHearthstone(context)
+            } else {
+                val manager = context.getSystemService(MediaProjectionManager::class.java)
+                captureLauncher.launch(manager.createScreenCaptureIntent())
+            }
+        }
+    }
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        requestCapture()
+    }
+    val proceed: () -> Unit = remember(context, notificationLauncher, requestCapture) {
+        {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                requestCapture()
+            }
+        }
+    }
+
+    // Nach der Rückkehr aus den Systemeinstellungen automatisch weitermachen.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, proceed) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && waitingForOverlayPermission && OverlayLauncher.canDrawOverlays(context)) {
+                waitingForOverlayPermission = false
+                proceed()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    return remember(context, proceed) {
+        {
+            if (!OverlayLauncher.canDrawOverlays(context)) {
+                waitingForOverlayPermission = true
+                context.toast("Einmalig: „Über anderen Apps einblenden“ für HS Deck Tracker erlauben.")
+                OverlayLauncher.requestOverlayPermission(context)
+            } else {
+                proceed()
             }
         }
     }

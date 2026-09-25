@@ -136,7 +136,7 @@ class TrackerTest {
         for (line in powerLog.lines()) {
             for (event in parser.parseLine(line)) {
                 if (event is GameEvent.GameEnded) stateBeforeEnd = controller.state.value
-                controller.onLogEvent(event, TestCards.db)?.let { finished = it }
+                controller.onGameEvent(event, TestCards.db)?.let { finished = it }
             }
         }
         val before = assertNotNull(stateBeforeEnd)
@@ -180,7 +180,7 @@ class TrackerTest {
     fun endWithoutKnownResultDoesNotRecord() {
         val controller = TrackerController(clock = { 0L })
         controller.start(deck)
-        assertNull(controller.onLogEvent(GameEvent.GameEnded(null), TestCards.db))
+        assertNull(controller.onGameEvent(GameEvent.GameEnded(null), TestCards.db))
     }
 
     @Test

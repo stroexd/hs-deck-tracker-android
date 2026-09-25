@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Style
@@ -70,6 +71,7 @@ import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckTextParser
 import com.stroexd.hsdecktracker.core.stats.StatsCalculator
 import com.stroexd.hsdecktracker.core.stats.WinRate
+import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.Routes
 import com.stroexd.hsdecktracker.ui.components.Banner
@@ -107,6 +109,8 @@ fun DecksScreen(
     val collection by container.collection.collection.collectAsStateWithLifecycle()
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val matches by container.matches.matches.collectAsStateWithLifecycle()
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    val startTracking = rememberTrackingStarter()
 
     var formatFilter by rememberSaveable { mutableStateOf<GameFormat?>(null) }
     var sort by rememberSaveable { mutableStateOf(DeckSort.RECENT) }
@@ -195,6 +199,14 @@ fun DecksScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
+            item {
+                PlayCard(
+                    active = recognition.active,
+                    status = recognition.phaseLabel,
+                    onPlay = startTracking,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                )
+            }
             if (cardState.loading && cardState.db.isEmpty) {
                 item {
                     Column(Modifier.padding(16.dp)) {
@@ -293,6 +305,40 @@ fun DecksScreen(
                 navController.navigate(Routes.builder(cls = cls, format = GameFormat.STANDARD))
             },
         )
+    }
+}
+
+/** Einstieg „Spielen & tracken“: Hearthstone starten, alles Weitere erkennt die App selbst. */
+@Composable
+private fun PlayCard(active: Boolean, status: String, onPlay: () -> Unit, modifier: Modifier = Modifier) {
+    Card(
+        onClick = onPlay,
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.PlayCircle,
+                contentDescription = null,
+                tint = HsColors.Gold,
+                modifier = Modifier.width(40.dp).height(40.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    if (active) "Tracker aktiv" else "Spielen & automatisch tracken",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    if (active) "$status – tippen, um Hearthstone zu öffnen"
+                    else "Startet Hearthstone. Spielstart, dein Deck und die Karten des Gegners werden erkannt.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
     }
 }
 

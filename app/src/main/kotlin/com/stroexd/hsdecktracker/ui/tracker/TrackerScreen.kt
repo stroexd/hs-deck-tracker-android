@@ -13,8 +13,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Style
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,9 +34,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.stroexd.hsdecktracker.core.stats.MatchResult
 import com.stroexd.hsdecktracker.overlay.OverlayLauncher
-import com.stroexd.hsdecktracker.overlay.rememberOverlayStarter
+import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
-import com.stroexd.hsdecktracker.ui.components.Banner
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
 import com.stroexd.hsdecktracker.ui.components.EmptyState
 import com.stroexd.hsdecktracker.ui.toast
@@ -48,7 +49,8 @@ fun TrackerScreen(navController: NavHostController) {
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val decks by container.decks.decks.collectAsStateWithLifecycle()
     val metaState by container.meta.state.collectAsStateWithLifecycle()
-    val startOverlay = rememberOverlayStarter()
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    val startOverlay = rememberTrackingStarter()
 
     Scaffold(
         topBar = {
@@ -80,17 +82,26 @@ fun TrackerScreen(navController: NavHostController) {
                 item {
                     EmptyState(
                         icon = Icons.Filled.Style,
-                        title = "Welches Deck spielst du?",
-                        message = "Wähle ein Deck. Tippe im Spiel gezogene Karten an – oder aktiviere in den Einstellungen das automatische Tracking (experimentell).",
+                        title = if (recognition.active) "Warte auf die nächste Partie" else "Automatisch tracken",
+                        message = if (recognition.active) {
+                            "Die Erkennung läuft. Sobald in Hearthstone der Mulligan erscheint, startet der Tracker und erkennt dein Deck selbst."
+                        } else {
+                            "Tippe auf „Spielen“: Hearthstone startet, Spielstart, dein Deck und die Karten des Gegners werden automatisch erkannt."
+                        },
+                        actions = {
+                            Button(onClick = { startOverlay() }) {
+                                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                                Text("  Spielen & tracken")
+                            }
+                        },
                     )
                 }
-                if (settings.autoTrackingEnabled) {
-                    item {
-                        Banner(
-                            "Automatisches Tracking ist aktiv: Starte das Overlay – das Deck wird beim Spielstart aus Hearthstone übernommen.",
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
+                item {
+                    Text(
+                        "Oder ein Deck fest vorgeben:",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
                 }
                 items(decks.sortedByDescending { it.updatedAt }, key = { it.id }) { deck ->
                     ListItem(
@@ -123,6 +134,8 @@ fun TrackerScreen(navController: NavHostController) {
                 },
                 onNewGame = { container.tracker.newGame() },
                 modifier = Modifier.fillMaxSize(),
+                decks = decks,
+                onSelectDeck = { container.selectDeckForCurrentGame(it) },
             )
         }
     }

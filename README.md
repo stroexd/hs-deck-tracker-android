@@ -32,12 +32,17 @@ Deck-Tracker, Deck-Datenbank und Sammlungsverwaltung für Hearthstone – inspir
 - Alle sammelbaren Karten mit Bildern, Suche (Name, Text, Stamm, Schlüsselwort)
 - Filter: Format, Klasse, Mana, Seltenheit, Typ, Set, Besitz
 
-### Tracker & Overlay
-- **Overlay über Hearthstone:** verschiebbares, minimierbares Fenster mit den Karten, die noch im Deck sind
-- Gezogene Karten antippen (lange drücken = zurück ins Deck), Ziehwahrscheinlichkeit pro Karte
-- Gegner: Klasse, gespielte Karten, **Deck-Vorhersage** aus den Meta-Decks
-- Sieg/Niederlage speichern, Zug und Münze werden erfasst
-- **Automatisches Tracking (experimentell):** liest `Power.log`/`Decks.log` von Hearthstone (wie HDT). Benötigt Zugriff auf `Android/data/com.blizzard.wtcg.hearthstone/files` – ab Android 11 auf vielen Geräten gesperrt.
+### Automatischer Tracker & Overlay
+- **„Spielen & tracken“** (Startseite oder App-Symbol lange drücken): Hearthstone startet, danach läuft alles automatisch
+- **Automatische Erkennung per Bildschirm-Texterkennung** (ML Kit, komplett auf dem Gerät):
+  - Spielstart am Mulligan – der Tracker startet von selbst
+  - **Eigenes Deck** wird aus den ersten Karten erkannt (eigene Decks, sonst Meta-Decks); gezogene Karten werden abgezogen
+  - **Gegner:** gespielte Karten, Klasse und Deck-Vorhersage aus den Meta-Decks
+  - Züge, am Zug/Münze und Ergebnis (Sieg/Niederlage) → Partie landet automatisch in der Match-History
+- Hearthstone-Client auf Deutsch oder Englisch
+- Verschiebbares, minimierbares **Overlay** über dem Spiel; Korrekturen per Antippen jederzeit möglich
+- Android fragt einmal pro Sitzung nach der Bildschirmaufnahme (Systemvorgabe); einmalig muss „Über anderen Apps einblenden“ erlaubt werden
+- Diagnose-Modus (Einstellungen): speichert erkannte Texte + einige Bildschirmfotos lokal, um die Erkennung für das eigene Gerät zu verbessern
 
 ### Match-History (wie „My Replays“ bei HSReplay)
 - Alle Partien, nach Tagen gruppiert mit Tagesbilanz

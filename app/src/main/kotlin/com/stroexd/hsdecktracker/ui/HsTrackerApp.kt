@@ -29,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.cards.HsClass
+import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.cards.CardsScreen
 import com.stroexd.hsdecktracker.ui.collection.CollectionScreen
 import com.stroexd.hsdecktracker.ui.collection.CraftCheckScreen
@@ -85,6 +86,8 @@ fun HsTrackerApp(
     onSharedTextHandled: () -> Unit,
     openTracker: Boolean,
     onTrackerOpened: () -> Unit,
+    playRequested: Boolean = false,
+    onPlayHandled: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -93,6 +96,13 @@ fun HsTrackerApp(
 
     LaunchedEffect(sharedText) {
         if (sharedText != null && currentRoute != Routes.DECKS) navController.navigateTopLevel(Routes.DECKS)
+    }
+    val startTracking = rememberTrackingStarter()
+    LaunchedEffect(playRequested) {
+        if (playRequested) {
+            onPlayHandled()
+            startTracking()
+        }
     }
     LaunchedEffect(openTracker) {
         if (openTracker) {

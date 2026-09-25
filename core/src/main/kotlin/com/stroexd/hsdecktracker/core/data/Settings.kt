@@ -50,10 +50,12 @@ data class AppSettings(
     val overlayOpacity: Float = 0.92f,
     val overlayShowOdds: Boolean = true,
     val overlayWidthDp: Int = 230,
-    /** SAF-Tree-URI des Hearthstone-Ordners (für automatisches Tracking). */
-    val logTreeUri: String? = null,
-    val autoTrackingEnabled: Boolean = false,
+    /** Beendete Partien automatisch in der Match-History speichern. */
     val autoRecordMatches: Boolean = true,
+    /** Zuletzt erkannte Texte im Overlay anzeigen (zur Kontrolle der Bilderkennung). */
+    val showRecognitionDebug: Boolean = false,
+    /** Erkannte Texte und einige Bildschirmfotos lokal speichern, um die Erkennung zu verbessern. */
+    val recordDiagnostics: Boolean = false,
 ) {
     val formatRules: FormatRules get() = FormatRules(standardSetOverrides)
     val collectionOptions: CollectionOptions get() = CollectionOptions(coreSetOwned = coreSetOwned)

@@ -2,6 +2,7 @@
 
 package com.stroexd.hsdecktracker.ui.tracker
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -46,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -59,6 +62,7 @@ import com.stroexd.hsdecktracker.core.cards.CardFilter
 import com.stroexd.hsdecktracker.core.cards.CardSearch
 import com.stroexd.hsdecktracker.core.cards.FormatRules
 import com.stroexd.hsdecktracker.core.cards.HsClass
+import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckAnalysis
 import com.stroexd.hsdecktracker.core.meta.DeckPrediction
 import com.stroexd.hsdecktracker.core.stats.MatchResult
@@ -89,6 +93,8 @@ fun TrackerPanel(
     onNewGame: () -> Unit,
     modifier: Modifier = Modifier,
     onTextInputChange: (Boolean) -> Unit = {},
+    decks: List<Deck> = emptyList(),
+    onSelectDeck: ((Deck) -> Unit)? = null,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val rowHeight = if (compact) 30.dp else 40.dp
@@ -128,7 +134,7 @@ fun TrackerPanel(
         }
         Box(Modifier.weight(1f, fill = !compact)) {
             if (tab == 0) {
-                DeckTab(state, db, showOdds, rowHeight, onUpdate)
+                DeckTab(state, db, showOdds, rowHeight, onUpdate, decks, onSelectDeck)
             } else {
                 OpponentTab(state, db, predictions, compact, rowHeight, onUpdate, onTextInputChange)
             }
@@ -173,14 +179,12 @@ private fun DeckTab(
     showOdds: Boolean,
     rowHeight: androidx.compose.ui.unit.Dp,
     onUpdate: ((TrackerState) -> TrackerState) -> Unit,
+    decks: List<Deck>,
+    onSelectDeck: ((Deck) -> Unit)?,
 ) {
     val entries = remember(state.deckCards, db) { DeckAnalysis.entries(state.deckCards, db) }
     if (entries.isEmpty()) {
-        Text(
-            "Kein Deck gewählt. Starte den Tracker über ein Deck (Decks → Deck → Tracker/Overlay).",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(12.dp),
-        )
+        UnknownDeck(state, db, rowHeight, decks, onSelectDeck)
         return
     }
     LazyColumn(
@@ -221,6 +225,73 @@ private fun DeckTab(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(6.dp),
                 )
+            }
+        }
+    }
+}
+
+/** Deck noch unbekannt: bisher gesehene Karten zeigen und manuelle Auswahl anbieten. */
+@Composable
+private fun UnknownDeck(
+    state: TrackerState,
+    db: CardDatabase,
+    rowHeight: androidx.compose.ui.unit.Dp,
+    decks: List<Deck>,
+    onSelectDeck: ((Deck) -> Unit)?,
+) {
+    var choosing by remember { mutableStateOf(false) }
+    val candidates = remember(decks, state.playerClass) {
+        decks.sortedWith(compareByDescending<Deck> { it.heroClass == state.playerClass }.thenByDescending { it.updatedAt })
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        item(key = "info") {
+            Text(
+                if (state.autoTracked) {
+                    "Deck wird erkannt … Sobald ein paar Karten zu einem deiner Decks (oder einem Meta-Deck) passen, erscheint hier die Deckliste."
+                } else {
+                    "Kein Deck gewählt."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(6.dp),
+            )
+        }
+        if (state.extraDraws.isNotEmpty()) {
+            item(key = "seen-header") {
+                Text("Bisher gesehen", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 6.dp))
+            }
+            items(state.extraDraws.size, key = { "seen-$it" }) { index ->
+                val card = db.byCardId(state.extraDraws[index])
+                CardTile(card = card, name = card?.name ?: state.extraDraws[index], cost = card?.cost ?: 0, count = 1, height = rowHeight)
+            }
+        }
+        if (onSelectDeck != null && decks.isNotEmpty()) {
+            item(key = "choose") {
+                TextButton(onClick = { choosing = !choosing }) {
+                    Text(if (choosing) "Auswahl schließen" else "Deck selbst wählen")
+                }
+            }
+            if (choosing) {
+                items(candidates.size, key = { "deck-${candidates[it].id}" }) { index ->
+                    val deck = candidates[index]
+                    Surface(
+                        onClick = {
+                            onSelectDeck(deck)
+                            choosing = false
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(deck.heroClass.uiColor))
+                            Spacer(Modifier.width(6.dp))
+                            Text(deck.name, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
             }
         }
     }

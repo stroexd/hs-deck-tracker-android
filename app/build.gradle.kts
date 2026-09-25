@@ -15,8 +15,13 @@ android {
         applicationId = "com.stroexd.hsdecktracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
+
+        ndk {
+            // Texterkennung (ML Kit) bringt native Bibliotheken mit – nur ARM für echte Geräte.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -70,7 +75,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.documentfile)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(platform(libs.compose.bom))

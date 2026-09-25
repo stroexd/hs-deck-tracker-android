@@ -2,8 +2,6 @@
 
 package com.stroexd.hsdecktracker.ui.settings
 
-import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -70,9 +68,9 @@ import com.stroexd.hsdecktracker.core.data.RankRange
 import com.stroexd.hsdecktracker.core.data.TimeRange
 import com.stroexd.hsdecktracker.core.data.cardLocales
 import com.stroexd.hsdecktracker.core.util.formatNumber
-import com.stroexd.hsdecktracker.logreader.HearthstoneLogWatcher
+import com.stroexd.hsdecktracker.vision.DiagnosticsRecorder
 import com.stroexd.hsdecktracker.overlay.OverlayLauncher
-import com.stroexd.hsdecktracker.overlay.rememberOverlayStarter
+import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.components.SectionHeader
 import com.stroexd.hsdecktracker.ui.formatDateTime
@@ -89,7 +87,8 @@ fun SettingsScreen(navController: NavHostController) {
     val snackbar = remember { SnackbarHostState() }
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val cardState by container.cards.state.collectAsStateWithLifecycle()
-    val startOverlay = rememberOverlayStarter()
+    val startOverlay = rememberTrackingStarter()
+    val recognition by container.recognition.collectAsStateWithLifecycle()
     var showSets by rememberSaveable { mutableStateOf(false) }
     var localeMenu by remember { mutableStateOf(false) }
     var customUrl by rememberSaveable(settings.metaCustomUrl) { mutableStateOf(settings.metaCustomUrl) }
@@ -99,14 +98,6 @@ fun SettingsScreen(navController: NavHostController) {
         scope.launch { container.settings.update(transform) }
     }
 
-    val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, flags) }
-                .recoverCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            update { it.copy(logTreeUri = uri.toString()) }
-        }
-    }
     val exportBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         val content = pendingBackup
         if (uri != null && content != null) {
@@ -126,7 +117,7 @@ fun SettingsScreen(navController: NavHostController) {
                     container.decks.replaceAll(data.decks)
                     container.collection.replace(data.collection)
                     container.matches.replaceAll(data.matches)
-                    container.settings.update { current -> data.settings.copy(logTreeUri = current.logTreeUri) }
+                    container.settings.update { data.settings }
                     data
                 }.onSuccess {
                     snackbar.showSnackbar("Backup geladen: ${it.decks.size} Decks, ${it.matches.size} Partien")
@@ -324,40 +315,52 @@ fun SettingsScreen(navController: NavHostController) {
                     }
                 }
             }
-            // ------------------------------------------------------------ Auto-Tracking
+            // ------------------------------------------------------------ Automatische Erkennung
             item {
-                SettingsCard("Automatisches Tracking (experimentell)") {
+                SettingsCard("Automatische Erkennung") {
                     Text(
-                        "Wie HDT/HSReplay: Die App liest das Power.log von Hearthstone und erkennt gezogene Karten, Karten des Gegners, " +
-                            "Gegnerklasse und Ergebnis automatisch. Dafür braucht die App Zugriff auf den Ordner " +
-                            "„Android/data/com.blizzard.wtcg.hearthstone/files“. Android 11+ erlaubt diesen Zugriff auf vielen Geräten " +
-                            "nicht mehr – dann bleibt das manuelle Tracking (Karten antippen).",
+                        "Tippe auf „Spielen“ (Startseite oder App-Symbol lange drücken). Android fragt einmal pro Sitzung nach der " +
+                            "Bildschirmaufnahme – danach erkennt die App selbstständig Spielstart, dein Deck, gezogene Karten, " +
+                            "die Karten des Gegners, Züge und das Ergebnis. Die Texterkennung läuft komplett auf dem Gerät, " +
+                            "es wird nichts hochgeladen. Tipp (Android 14+): „Einzelne App“ → Hearthstone wählen.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        "Ordner: " + (settings.logTreeUri?.let { Uri.decode(it).substringAfterLast(':') } ?: "nicht gewählt"),
+                        if (recognition.active) "Status: aktiv · ${recognition.phaseLabel} · ${recognition.frames} Bilder ausgewertet"
+                        else "Status: aus",
                         style = MaterialTheme.typography.labelMedium,
+                        color = if (recognition.active) HsColors.Win else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = { pickFolder.launch(HearthstoneLogWatcher.initialFolderUri()) }) {
-                            Text("Hearthstone-Ordner wählen")
-                        }
-                        if (settings.logTreeUri != null) {
-                            TextButton(onClick = { update { it.copy(logTreeUri = null, autoTrackingEnabled = false) } }) { Text("Entfernen") }
-                        }
-                    }
-                    SwitchRow(
-                        title = "Automatisches Tracking aktivieren",
-                        subtitle = "Läuft, solange das Overlay aktiv ist. Beim ersten Mal wird eine log.config angelegt – danach Hearthstone neu starten.",
-                        checked = settings.autoTrackingEnabled,
-                        enabled = settings.logTreeUri != null,
-                        onChange = { v -> update { it.copy(autoTrackingEnabled = v) } },
-                    )
+                    FilledTonalButton(onClick = { startOverlay() }) { Text(if (recognition.active) "Hearthstone öffnen" else "Spielen & tracken") }
                     SwitchRow(
                         title = "Partien automatisch speichern",
+                        subtitle = "Beendete Partien landen mit Zugverlauf in der Match-History.",
                         checked = settings.autoRecordMatches,
                         onChange = { v -> update { it.copy(autoRecordMatches = v) } },
                     )
+                    SwitchRow(
+                        title = "Erkannte Texte im Overlay anzeigen",
+                        subtitle = "Zur Kontrolle, was die Erkennung gerade sieht.",
+                        checked = settings.showRecognitionDebug,
+                        onChange = { v -> update { it.copy(showRecognitionDebug = v) } },
+                    )
+                    SwitchRow(
+                        title = "Diagnose aufzeichnen",
+                        subtitle = "Speichert erkannte Texte und einige verkleinerte Bildschirmfotos lokal. Hilft, die Erkennung an dein Gerät anzupassen (wirkt ab dem nächsten Start).",
+                        checked = settings.recordDiagnostics,
+                        onChange = { v -> update { it.copy(recordDiagnostics = v) } },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            if (!DiagnosticsRecorder.share(context)) {
+                                scope.launch { snackbar.showSnackbar("Noch keine Diagnose aufgezeichnet") }
+                            }
+                        }) { Text("Diagnose teilen") }
+                        TextButton(onClick = {
+                            DiagnosticsRecorder.clear(context)
+                            scope.launch { snackbar.showSnackbar("Diagnose gelöscht") }
+                        }) { Text("Löschen") }
+                    }
                 }
             }
             // ------------------------------------------------------------ Backup
