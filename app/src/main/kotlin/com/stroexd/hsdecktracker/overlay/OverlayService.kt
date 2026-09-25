@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,9 +32,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +54,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -72,9 +76,12 @@ import com.stroexd.hsdecktracker.ui.labelRes
 import com.stroexd.hsdecktracker.ui.localized
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.HsTheme
+import com.stroexd.hsdecktracker.ui.toast
 import com.stroexd.hsdecktracker.ui.tracker.TrackerPanel
 import com.stroexd.hsdecktracker.vision.DiagnosticsRecorder
 import com.stroexd.hsdecktracker.vision.ScreenRecognizer
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 class OverlayService : LifecycleService(), SavedStateRegistryOwner {
     private val savedStateController = SavedStateRegistryController.create(this)
@@ -343,9 +350,13 @@ private fun OverlayContent(
                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close), modifier = Modifier.size(18.dp))
                 }
             }
+            val scanning by remember { container.recognition.map { it.scan != null }.distinctUntilChanged() }
+                .collectAsStateWithLifecycle(initialValue = false)
             if (settings.showRecognitionDebug) RecognitionDebugLine(container)
             val current = state
-            if (current == null) {
+            if (scanning) {
+                CollectionScanPanel(container)
+            } else if (current == null) {
                 IdleHint(container)
             } else {
                 TrackerPanel(
@@ -383,6 +394,42 @@ private fun RecognitionDebugLine(container: AppContainer) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
     )
+}
+
+@Composable
+private fun CollectionScanPanel(container: AppContainer) {
+    val context = LocalContext.current
+    val recognition by container.recognition.collectAsStateWithLifecycle()
+    val scan = recognition.scan ?: return
+    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(R.string.scan_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(
+            stringResource(if (recognition.active) R.string.scan_instructions else R.string.scan_needs_capture),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(stringResource(R.string.scan_progress, scan.pages, scan.cards, scan.copies), style = MaterialTheme.typography.labelLarge)
+        if (scan.lastPage.isNotEmpty()) {
+            Text(
+                stringResource(R.string.scan_last_page, scan.lastPage.joinToString(", ")),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(
+                onClick = {
+                    container.finishCollectionScan(save = true) { changed ->
+                        context.toast(context.resources.getQuantityString(R.plurals.scan_saved, changed, changed))
+                    }
+                },
+                enabled = scan.cards > 0,
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.save)) }
+            OutlinedButton(onClick = { container.finishCollectionScan(save = false) }) { Text(stringResource(R.string.cancel)) }
+        }
+    }
 }
 
 @Composable

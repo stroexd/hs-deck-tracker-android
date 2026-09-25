@@ -3,6 +3,8 @@ package com.stroexd.hsdecktracker.core.collection
 import com.stroexd.hsdecktracker.core.cards.Card
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
 import com.stroexd.hsdecktracker.core.cards.CardSets
+import com.stroexd.hsdecktracker.core.cards.FormatRules
+import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.cards.Rarity
 import com.stroexd.hsdecktracker.core.deck.SideboardCard
 import kotlinx.serialization.Serializable
@@ -47,6 +49,43 @@ data class CardCollection(
         if (current.total >= required) return this
         return copy(cards = cards + (dbfId to current.copy(normal = current.normal + required - current.total)))
     }
+}
+
+/**
+ * Applies copies read from Hearthstone's collection. Reprints share a name, so the copies are spread over
+ * the printings: known counts stay, the rest goes to the likeliest printing (free Core, Standard, newest).
+ */
+fun CardCollection.withScannedCopies(totals: Map<List<Int>, Int>, db: CardDatabase, rules: FormatRules): CardCollection {
+    val updated = cards.toMutableMap()
+    for ((ids, copies) in totals) {
+        val printings = ids.mapNotNull(db::byDbfId).sortedWith(
+            compareByDescending<Card> { it.set in CardSets.freeSets }
+                .thenByDescending { rules.isLegal(it, GameFormat.STANDARD) }
+                .thenByDescending { it.dbfId },
+        )
+        if (printings.isEmpty() || printings.sumOf { owned(it.dbfId) } == copies) continue
+        val assigned = LinkedHashMap<Int, Int>()
+        var left = copies
+        for (card in printings) {
+            val keep = minOf(owned(card.dbfId), left)
+            assigned[card.dbfId] = keep
+            left -= keep
+        }
+        for (card in printings) {
+            val add = minOf(left, (card.maxCopies - assigned.getValue(card.dbfId)).coerceAtLeast(0))
+            assigned[card.dbfId] = assigned.getValue(card.dbfId) + add
+            left -= add
+        }
+        assigned[printings.first().dbfId] = assigned.getValue(printings.first().dbfId) + left
+        for ((id, count) in assigned) {
+            val current = cards[id] ?: OwnedCard()
+            if (current.total == count) continue
+            val premium = current.total - current.normal
+            val next = if (premium <= count) current.copy(normal = count - premium) else OwnedCard(normal = count)
+            if (next.total == 0) updated -= id else updated[id] = next
+        }
+    }
+    return copy(cards = updated)
 }
 
 data class CollectionOptions(

@@ -504,4 +504,17 @@
     <string name="diagnostics_subject">HS Deck Tracker – Diagnose</string>
     <string name="capture_denied">Ohne Bildschirmaufnahme keine automatische Erkennung – Karten können im Overlay angetippt werden.</string>
     <string name="overlay_permission_hint">Einmalig: „Über anderen Apps einblenden“ für HS Deck Tracker erlauben.</string>
+    <string name="scan_collection">Aus Hearthstone synchronisieren</string>
+    <string name="scan_collection_hint">Synchronisieren: Öffne in Hearthstone deine Sammlung und blättere durch die Seiten – die App liest deine Karten vom Bildschirm. Keine andere App und kein PC nötig.</string>
+    <string name="scan_tip">Tipp: Filtere in Hearthstone nach Set, um nur neue Karten zu synchronisieren. Karten, an denen du nicht vorbeiblätterst, behalten ihre Anzahl.</string>
+    <string name="scan_title">Sammlung synchronisieren</string>
+    <string name="scan_instructions">Öffne in Hearthstone die „Sammlung“ und blättere durch die Seiten. Warte auf jeder Seite kurz, bis der Zähler steigt. Der Herstellungsmodus muss aus sein.</string>
+    <string name="scan_needs_capture">Die Bildschirmaufnahme ist aus. Starte die Synchronisierung erneut aus der App.</string>
+    <string name="scan_progress">Seiten: %1$d · Karten: %2$d · Exemplare: %3$d</string>
+    <string name="scan_last_page">Letzte Seite: %1$s</string>
+    <string name="scan_running">Synchronisierung der Sammlung läuft</string>
+    <plurals name="scan_saved">
+        <item quantity="one">Sammlung aktualisiert: %1$d Karte geändert</item>
+        <item quantity="other">Sammlung aktualisiert: %1$d Karten geändert</item>
+    </plurals>
 </resources>

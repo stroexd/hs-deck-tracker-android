@@ -1,9 +1,11 @@
 package com.stroexd.hsdecktracker.core.data
 
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
+import com.stroexd.hsdecktracker.core.cards.FormatRules
 import com.stroexd.hsdecktracker.core.cards.HsClass
 import com.stroexd.hsdecktracker.core.collection.CardCollection
 import com.stroexd.hsdecktracker.core.collection.CollectionImportResult
+import com.stroexd.hsdecktracker.core.collection.withScannedCopies
 import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckTextParser
 import com.stroexd.hsdecktracker.core.stats.MatchRecord
@@ -73,6 +75,17 @@ class CollectionRepository(dir: File, private val clock: () -> Long = System::cu
         store.update { current ->
             counts.entries.fold(current) { acc, (id, count) -> acc.withNormalCount(id, count) }.copy(updatedAt = clock())
         }
+    }
+
+    /** Returns how many cards changed. */
+    suspend fun applyScan(totals: Map<List<Int>, Int>, db: CardDatabase, rules: FormatRules): Int {
+        var changed = 0
+        store.update { current ->
+            val next = current.withScannedCopies(totals, db, rules)
+            changed = (current.cards.keys + next.cards.keys).count { current.owned(it) != next.owned(it) }
+            next.copy(updatedAt = clock(), source = "Hearthstone")
+        }
+        return changed
     }
 
     suspend fun setDust(dust: Int) {

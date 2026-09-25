@@ -505,4 +505,17 @@
     <string name="diagnostics_subject">HS Deck Tracker – diagnostics</string>
     <string name="capture_denied">Without screen capture there\'s no automatic recognition – cards can still be tapped in the overlay.</string>
     <string name="overlay_permission_hint">One time: allow \"Display over other apps\" for HS Deck Tracker.</string>
+    <string name="scan_collection">Sync from Hearthstone</string>
+    <string name="scan_collection_hint">Sync: open your collection in Hearthstone and flip through the pages – the app reads your cards from the screen. No other app or PC needed.</string>
+    <string name="scan_tip">Tip: filter by set in Hearthstone to sync only new cards. Cards you don\'t flip past keep their count.</string>
+    <string name="scan_title">Collection sync</string>
+    <string name="scan_instructions">Open \"Collection\" in Hearthstone and flip through the pages. Wait briefly on each page until the counter goes up. Crafting mode must be off.</string>
+    <string name="scan_needs_capture">Screen capture is off. Start the sync again from the app.</string>
+    <string name="scan_progress">Pages: %1$d · Cards: %2$d · Copies: %3$d</string>
+    <string name="scan_last_page">Last page: %1$s</string>
+    <string name="scan_running">Collection sync running</string>
+    <plurals name="scan_saved">
+        <item quantity="one">Collection updated: %1$d card changed</item>
+        <item quantity="other">Collection updated: %1$d cards changed</item>
+    </plurals>
 </resources>
