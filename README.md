@@ -4,6 +4,7 @@
 ![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 **English** · [Deutsch](README.de.md)
 
@@ -118,6 +119,10 @@ session (recognized text per frame); such a session can be replayed on the deskt
 ```bash
 HS_DIAG_DIR=<session dir> HS_CARDS_DIR=<dir with cards.enUS.json / cards.deDE.json> ./gradlew :core:test --tests '*DiagnosticsReplay*'
 ```
+
+## License
+
+HS Deck Tracker is free software, licensed under the [GNU General Public License v3.0](LICENSE).
 
 ## Credits & disclaimer
 
