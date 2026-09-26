@@ -116,8 +116,12 @@ The same signed APK comes three ways – pick one:
 | | How | Updates |
 |---|---|---|
 | **GitHub** | [Download the APK](https://github.com/stroexd/hs-deck-tracker-android/releases/latest/download/hs-deck-tracker.apk) on the phone and open it (allow your browser to install apps) | download the new version, it installs over the old one |
-| **F-Droid repository** | In F-Droid, Droid-ify or Neo Store: Settings → Repositories → + and add `https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo` – or scan the QR code on the [repository page](https://github.com/stroexd/hs-deck-tracker-android/tree/fdroid), which also shows the key fingerprint | through the app store |
+| **F-Droid repository** | In F-Droid, Droid-ify or Neo Store: Settings → Repositories → + and add `https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo` – or scan the QR code below | through the app store |
 | **Obtainium** | [Add to Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.stroexd.hsdecktracker%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstroexd%2Fhs-deck-tracker-android%22%2C%22author%22%3A%22stroexd%22%2C%22name%22%3A%22HS%20Deck%20Tracker%22%7D) – it installs straight from the GitHub releases | through Obtainium |
+
+<img src="https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo/index.png" alt="QR code of the F-Droid repository" width="160" align="right">
+
+F-Droid repository fingerprint (SHA-256): `0213F88492126999BD836A7E112387F59921BB6FEF20F4B2038C7268809066A0`
 
 Requires Android 8.0 or newer (background tracking: Android 11). For background tracking tap **Set up** in the app
 and turn on "HS Deck Tracker" under Accessibility. If Android shows it greyed out ("restricted setting", mostly after
