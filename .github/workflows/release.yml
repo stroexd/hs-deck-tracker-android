@@ -1,21 +1,33 @@
-# Builds a signed release: the App Bundle for Google Play and the APK for GitHub.
-# Start it from the Actions tab or push a tag like v1.3.0 (that also creates a GitHub release).
+# Publishes a release: the signed APK as a GitHub release and the F-Droid repository on the `fdroid` branch.
+# Run it from the Actions tab (without a version it takes the next patch version) or push a tag like v1.4.0.
 name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Version like 1.4.0 (empty = next patch version)
+        required: false
   push:
     tags: [ 'v*' ]
 
 permissions:
   contents: write
 
+concurrency: release
+
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v5
         with:
@@ -24,57 +36,121 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Unlock the upload key
+      - name: Version
         env:
-          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ ! -f signing/upload.p12.enc ]; then
-            echo "::error::No upload key yet: run the 'Create upload key' workflow first"; exit 1
+          code_of() { IFS=. read -r major minor patch <<< "$1"; echo $((major * 10000 + minor * 100 + patch)); }
+          latest=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n1)
+          latest=${latest#v}
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version=${GITHUB_REF_NAME#v}
+            latest=$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -vx "$GITHUB_REF_NAME" | head -n1)
+            latest=${latest#v}
+          elif [ -n "$INPUT_VERSION" ]; then
+            version=${INPUT_VERSION#v}
+          elif [ -n "$latest" ]; then
+            IFS=. read -r major minor patch <<< "$latest"
+            version="$major.$minor.$((patch + 1))"
+          else
+            version=$(grep -oP 'versionName.*\?: "\K[^"]+' app/build.gradle.kts)
           fi
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in signing/upload.p12.enc -out "$RUNNER_TEMP/upload.p12" \
-            -pass env:UPLOAD_KEY_PASSWORD
-          echo "UPLOAD_KEYSTORE=$RUNNER_TEMP/upload.p12" >> "$GITHUB_ENV"
+          if ! [[ $version =~ ^[0-9]+\.[0-9]{1,2}\.[0-9]{1,2}$ ]]; then
+            echo "::error::Versions look like 1.4.0, got '$version'"; exit 1
+          fi
+          if [ -n "$latest" ] && [ "$(code_of "$version")" -le "$(code_of "$latest")" ]; then
+            echo "::error::$version is not newer than the last release $latest"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$(code_of "$version")" >> "$GITHUB_ENV"
+
+      - name: Signing keys
+        run: |
+          if [ ${#SIGNING_PASSWORD} -lt 20 ]; then
+            echo "::error::Add the repository secret SIGNING_PASSWORD (at least 20 random characters), see docs/RELEASING.md"
+            exit 1
+          fi
+          keys=signing/keys.p12.enc
+          if [ ! -f $keys ] && git cat-file -e "origin/$DEFAULT_BRANCH:$keys" 2>/dev/null; then
+            git show "origin/$DEFAULT_BRANCH:$keys" > $keys
+          fi
+          if [ -f $keys ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in $keys -out "$RUNNER_TEMP/keys.p12" -pass env:SIGNING_PASSWORD
+          else
+            if [ -n "$(gh release list --limit 1)" ]; then
+              echo "::error::$keys is missing although there are releases; new keys would break updates"; exit 1
+            fi
+            # First release: create the keys and keep them in the repository, encrypted with the secret
+            keytool -genkeypair -keystore "$RUNNER_TEMP/keys.p12" -storetype PKCS12 -alias release -keyalg RSA \
+              -keysize 4096 -validity 10000 -dname "CN=HS Deck Tracker" -storepass:env SIGNING_PASSWORD
+            keytool -genkeypair -keystore "$RUNNER_TEMP/keys.p12" -storetype PKCS12 -alias fdroid -keyalg RSA \
+              -keysize 4096 -validity 10000 -dname "CN=HS Deck Tracker F-Droid repository" -storepass:env SIGNING_PASSWORD
+            git worktree add "$RUNNER_TEMP/default" "origin/$DEFAULT_BRANCH"
+            mkdir -p "$RUNNER_TEMP/default/signing"
+            openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -in "$RUNNER_TEMP/keys.p12" \
+              -out "$RUNNER_TEMP/default/$keys" -pass env:SIGNING_PASSWORD
+            cd "$RUNNER_TEMP/default"
+            git add $keys
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "Add the encrypted signing keys"
+            git push origin "HEAD:$DEFAULT_BRANCH"
+          fi
+          echo "SIGNING_KEYSTORE=$RUNNER_TEMP/keys.p12" >> "$GITHUB_ENV"
 
       - name: Build
-        env:
-          UPLOAD_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :core:test :app:assembleRelease -PversionCode="$VERSION_CODE" -PversionName="$VERSION"
+
+      - name: Check the APK
         run: |
-          VERSION_ARGS="-PversionCode=$((100 + GITHUB_RUN_NUMBER))"
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then VERSION_ARGS="$VERSION_ARGS -PversionName=${GITHUB_REF_NAME#v}"; fi
-          ./gradlew --no-daemon :core:test :app:bundlePlayRelease :app:assembleGithubRelease $VERSION_ARGS
-
-      - name: Check 16 KB page alignment
-        run: python3 scripts/check_16kb_alignment.py app/build/outputs/bundle/playRelease/*.aab
-
-      - name: Upload the Play bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: play-bundle
-          path: app/build/outputs/bundle/playRelease/*.aab
-          if-no-files-found: error
-
-      - name: Upload the APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: hs-deck-tracker-apk
-          path: app/build/outputs/apk/github/release/*.apk
-          if-no-files-found: error
+          apk=app/build/outputs/apk/release/app-release.apk
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n1)apksigner"
+          "$apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/certs.txt"
+          if grep -q "CN=Android Debug" "$RUNNER_TEMP/certs.txt"; then
+            echo "::error::The APK is signed with the debug key"; exit 1
+          fi
+          python3 scripts/check_16kb_alignment.py "$apk"
+          cp "$apk" "$RUNNER_TEMP/hs-deck-tracker.apk"
 
       - name: GitHub release
-        if: github.ref_type == 'tag'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" app/build/outputs/apk/github/release/*.apk --generate-notes
+        run: |
+          gh release create "v$VERSION" "$RUNNER_TEMP/hs-deck-tracker.apk" --target "$GITHUB_SHA" \
+            --title "HS Deck Tracker $VERSION" --generate-notes
 
-      # Optional: with a service account from the Play Console, releases go straight to internal testing
-      - name: Upload to Google Play (internal testing)
-        env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-        if: env.PLAY_SERVICE_ACCOUNT_JSON != ''
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.stroexd.hsdecktracker
-          releaseFiles: app/build/outputs/bundle/playRelease/*.aab
-          track: internal
-          status: completed
+      - name: F-Droid repository
+        run: |
+          pipx install fdroidserver==2.4.5
+          # "What's new" in F-Droid: the pull request titles from the release notes
+          changelog=fastlane/metadata/android/en-US/changelogs/$VERSION_CODE.txt
+          mkdir -p "$(dirname "$changelog")"
+          gh release view "v$VERSION" --json body --jq .body \
+            | sed -n 's/^\* \(.*\) by @.* in https.*$/• \1/p' | head -n 6 > "$changelog"
+          [ -s "$changelog" ] || rm "$changelog"
+
+          url="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/fdroid/repo"
+          FDROID_REPO_URL=$url scripts/fdroid-repo.sh "$RUNNER_TEMP/hs-deck-tracker.apk" "$SIGNING_KEYSTORE" "$RUNNER_TEMP/site"
+          fingerprint=$(keytool -exportcert -alias fdroid -keystore "$SIGNING_KEYSTORE" -storepass:env SIGNING_PASSWORD \
+            | sha256sum | cut -d' ' -f1 | tr a-f A-F)
+          cat > "$RUNNER_TEMP/site/README.md" <<README
+          # HS Deck Tracker – F-Droid repository
+
+          Add this repository in F-Droid, Droid-ify or Neo Store (Settings → Repositories → +), or scan the QR code in
+          the app store's "add repository" screen:
+
+          \`\`\`
+          $url?fingerprint=$fingerprint
+          \`\`\`
+
+          [Open in F-Droid](https://fdroid.link/#$url?fingerprint=$fingerprint)
+
+          <img src="repo/index.png" alt="QR code" width="220">
+
+          Current version: **$VERSION**. This branch is rebuilt by the release workflow of
+          [$GITHUB_REPOSITORY](https://github.com/$GITHUB_REPOSITORY); don't edit it.
+          README
+
+          cd "$RUNNER_TEMP/site"
+          git init -q -b fdroid
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "F-Droid repository with version $VERSION"
+          git push -f "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" fdroid

@@ -14,6 +14,8 @@ inspiriert von HSReplay.net und HearthPwn.
 Die App trackt deine Partien, während du Hearthstone auf demselben Gerät spielst. Sie liest den Bildschirm per
 Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hilfs-App**.
 
+**[Installieren](#installation)** – als APK, aus dem eigenen F-Droid-Repository oder mit Obtainium.
+
 ## Highlights
 
 - **Automatisches Tracking** – Spielstart, beide Klassen, Mulligan und gezogene Karten, dein Deck, die gespielten
@@ -106,14 +108,23 @@ willkommen – alle Texte liegen in `app/src/main/res/values*/strings.xml`.
 
 ## Installation
 
-Die APK aus dem neuesten [GitHub-Release](https://github.com/stroexd/hs-deck-tracker-android/releases) herunterladen
-und installieren (Installation aus unbekannten Quellen erlauben). Releases sind mit demselben Schlüssel signiert,
-Updates lassen sich also drüberinstallieren. Eine Google-Play-Version ist in Vorbereitung; sie trackt nur per
-Bildschirmfreigabe, weil Play Bedienungshilfen einschränkt.
+<p>
+  <a href="https://github.com/stroexd/hs-deck-tracker-android/releases/latest/download/hs-deck-tracker.apk"><img src="https://img.shields.io/github/v/release/stroexd/hs-deck-tracker-android?label=APK&logo=github&style=for-the-badge" alt="APK herunterladen" height="40"></a>
+  <a href="https://github.com/stroexd/hs-deck-tracker-android/tree/fdroid"><img src="https://img.shields.io/badge/F--Droid-repository-1976D2?logo=fdroid&logoColor=white&style=for-the-badge" alt="F-Droid-Repository" height="40"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.stroexd.hsdecktracker%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstroexd%2Fhs-deck-tracker-android%22%2C%22author%22%3A%22stroexd%22%2C%22name%22%3A%22HS%20Deck%20Tracker%22%7D"><img src="docs/badges/obtainium.png" alt="Bei Obtainium holen" height="40"></a>
+</p>
+
+Dieselbe signierte APK gibt es auf drei Wegen – einen aussuchen:
+
+| | So geht's | Updates |
+|---|---|---|
+| **GitHub** | [APK herunterladen](https://github.com/stroexd/hs-deck-tracker-android/releases/latest/download/hs-deck-tracker.apk) auf dem Handy und öffnen (dem Browser das Installieren von Apps erlauben) | neue Version herunterladen, sie installiert sich über die alte |
+| **F-Droid-Repository** | In F-Droid, Droid-ify oder Neo Store: Einstellungen → Paketquellen → + und `https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo` hinzufügen – oder den QR-Code auf der [Repository-Seite](https://github.com/stroexd/hs-deck-tracker-android/tree/fdroid) scannen, dort steht auch der Schlüssel-Fingerabdruck | über den App-Store |
+| **Obtainium** | [Zu Obtainium hinzufügen](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.stroexd.hsdecktracker%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstroexd%2Fhs-deck-tracker-android%22%2C%22author%22%3A%22stroexd%22%2C%22name%22%3A%22HS%20Deck%20Tracker%22%7D) – installiert direkt aus den GitHub-Releases | über Obtainium |
 
 Benötigt Android 8.0 oder neuer (Hintergrund-Tracking: Android 11). Fürs Hintergrund-Tracking in der App auf
 **Einrichten** tippen und unter Bedienungshilfen „HS Deck Tracker“ einschalten. Ist der Eintrag ausgegraut
-(„eingeschränkte Einstellung“, weil die APK nicht aus einem App-Store kommt): App-Info → ⋮ → **Eingeschränkte
+(„eingeschränkte Einstellung“, meist nach der Installation über den Browser): App-Info → ⋮ → **Eingeschränkte
 Einstellungen zulassen**, dann erneut versuchen.
 
 ## Datenschutz
@@ -138,7 +149,7 @@ Vollständige Richtlinie (Englisch): [PRIVACY.md](PRIVACY.md).
 | Modul | Inhalt |
 |---|---|
 | `core/` | Reines Kotlin/JVM: Deck-Code-Codec, Kartendatenbank, Sammlungs-Import, Staubkosten, Meta-Parser, Gegner-Vorhersage, Statistik, Datenhaltung und die Zustandsmaschine der Bildschirmerkennung (`vision/`) |
-| `app/` | Android-App: Jetpack Compose + Material 3, Overlay, Bildschirmaufnahme (Bildschirmfreigabe oder Screenshots der Bedienungshilfe) und ML-Kit-Texterkennung; Varianten `github` und `play` |
+| `app/` | Android-App: Jetpack Compose + Material 3, Overlay, Bildschirmaufnahme (Bildschirmfreigabe oder Screenshots der Bedienungshilfe) und ML-Kit-Texterkennung |
 
 Die Erkennungslogik liegt in `core` und wird ohne Gerät getestet. Mit aktivierter Diagnose zeichnet die App eine
 Sitzung auf (erkannter Text je Bild); diese lässt sich am Rechner erneut abspielen:

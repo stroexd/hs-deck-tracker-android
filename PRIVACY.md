@@ -12,7 +12,7 @@ and no tracking.
 
 ## Screen access
 - **Screen sharing:** Android asks for permission every session; you can stop it at any time from the notification.
-- **Background tracking (GitHub version only):** the app's accessibility service notices which app is in front and
+- **Background tracking (Android 11+):** the app's accessibility service notices which app is in front and
   takes screenshots only while Hearthstone is. It never reads the content of other apps. You switch it on and off in
   Android's accessibility settings.
 

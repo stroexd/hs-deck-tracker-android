@@ -9,4 +9,5 @@ build/
 .externalNativeBuild
 .cxx
 *.keystore
+*.p12
 !debug.keystore
