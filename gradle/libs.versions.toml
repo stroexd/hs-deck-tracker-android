@@ -11,6 +11,7 @@ lifecycle = "2.8.7"
 navigation = "2.8.9"
 coreKtx = "1.15.0"
 mlkitText = "16.0.1"
+mlkitTextPlay = "19.0.1"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -38,6 +39,7 @@ compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
+mlkit-text-recognition-play = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "mlkitTextPlay" }
 
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }

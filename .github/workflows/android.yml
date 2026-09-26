@@ -23,8 +23,11 @@ jobs:
       - name: Unit tests (core)
         run: ./gradlew --no-daemon :core:test
 
-      - name: Build APKs
-        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease
+      - name: Build APK (GitHub) and bundle (Play)
+        run: ./gradlew --no-daemon :app:assembleGithubRelease :app:bundlePlayRelease
+
+      - name: Check 16 KB page alignment (Play)
+        run: python3 scripts/check_16kb_alignment.py app/build/outputs/bundle/playRelease/*.aab
 
       - name: Upload test reports
         if: failure()
@@ -33,11 +36,9 @@ jobs:
           name: test-reports
           path: core/build/reports/tests/
 
-      - name: Upload APKs
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: hs-deck-tracker-apk
-          path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/github/release/*.apk
           if-no-files-found: error

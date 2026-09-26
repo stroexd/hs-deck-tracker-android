@@ -104,9 +104,10 @@ willkommen – alle Texte liegen in `app/src/main/res/values*/strings.xml`.
 
 ## Installation
 
-Jeder Push baut per GitHub Actions APKs: **Actions → Android CI → neuester Lauf** öffnen, das Artefakt
-`hs-deck-tracker-apk` herunterladen, entpacken und `app-release.apk` installieren (Installation aus unbekannten
-Quellen erlauben).
+Die APK aus dem neuesten [GitHub-Release](https://github.com/stroexd/hs-deck-tracker-android/releases) herunterladen
+und installieren (Installation aus unbekannten Quellen erlauben). Releases sind mit demselben Schlüssel signiert,
+Updates lassen sich also drüberinstallieren. Eine Google-Play-Version ist in Vorbereitung; sie trackt nur per
+Bildschirmfreigabe, weil Play Bedienungshilfen einschränkt.
 
 Benötigt Android 8.0 oder neuer (Hintergrund-Tracking: Android 11). Fürs Hintergrund-Tracking in der App auf
 **Einrichten** tippen und unter Bedienungshilfen „HS Deck Tracker“ einschalten. Ist der Eintrag ausgegraut
@@ -114,6 +115,8 @@ Benötigt Android 8.0 oder neuer (Hintergrund-Tracking: Android 11). Fürs Hinte
 Einstellungen zulassen**, dann erneut versuchen.
 
 ## Datenschutz
+
+Vollständige Richtlinie (Englisch): [PRIVACY.md](PRIVACY.md).
 
 - Die Bedienungshilfe liest nur, welche App vorne ist, und macht nur Screenshots, solange Hearthstone vorne ist;
   Inhalte anderer Apps liest sie nie.
@@ -133,7 +136,7 @@ Einstellungen zulassen**, dann erneut versuchen.
 | Modul | Inhalt |
 |---|---|
 | `core/` | Reines Kotlin/JVM: Deck-Code-Codec, Kartendatenbank, Sammlungs-Import, Staubkosten, Meta-Parser, Gegner-Vorhersage, Statistik, Datenhaltung und die Zustandsmaschine der Bildschirmerkennung (`vision/`) |
-| `app/` | Android-App: Jetpack Compose + Material 3, Overlay-Service, MediaProjection-Aufnahme und ML-Kit-Texterkennung |
+| `app/` | Android-App: Jetpack Compose + Material 3, Overlay, Bildschirmaufnahme (Bildschirmfreigabe oder Screenshots der Bedienungshilfe) und ML-Kit-Texterkennung; Varianten `github` und `play` |
 
 Die Erkennungslogik liegt in `core` und wird ohne Gerät getestet. Mit aktivierter Diagnose zeichnet die App eine
 Sitzung auf (erkannter Text je Bild); diese lässt sich am Rechner erneut abspielen:
@@ -145,6 +148,8 @@ HS_DIAG_DIR=<Sitzungsordner> HS_CARDS_DIR=<Ordner mit cards.enUS.json / cards.de
 ## Lizenz
 
 HS Deck Tracker ist freie Software unter der [GNU General Public License v3.0](LICENSE).
+
+Releases baut GitHub Actions, siehe [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Quellen & Hinweis
 
