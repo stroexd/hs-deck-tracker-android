@@ -29,6 +29,8 @@ class DiagnosticsRecorder(root: File) {
     fun record(frame: OcrFrame, events: List<GameEvent>, notes: List<String>, bitmap: Bitmap) {
         if (frames >= MAX_FRAMES) return
         frames++
+        // "Delete" in the settings may have removed the folder while recording
+        sessionDir.mkdirs()
         ocrFile.appendText(AppJson.encodeToString(OcrFrame.serializer(), frame) + "\n")
         if (events.isNotEmpty() || notes.isNotEmpty()) {
             eventsFile.appendText(

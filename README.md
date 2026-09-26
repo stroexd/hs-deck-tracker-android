@@ -43,7 +43,9 @@ recognition, so it needs **no root, no Shizuku, no PC and no helper app**.
 - **Battery friendly:** the screen is captured in intervals (about 2 frames/s in a game, one every 1.5 s in menus)
   and the capture is detached in between; unchanged frames skip text recognition; recognition pauses while the
   screen is off or in portrait mode and slows down in battery saver or when the device is hot.
-- A draggable, collapsible overlay; every detection can be corrected with a tap.
+- **The overlay sits in the empty margin next to the board**, so on wide phones it covers no cards: its size follows
+  the screen, it keeps clear of the camera and the rounded corners, and it snaps to the left or right margin when you
+  drag it. It collapses to a bubble, and every detection can be corrected with a tap.
 
 ### Collection & crafting
 - **Sync from Hearthstone:** open your collection in the game and flip through the pages – the app reads card names

@@ -3,6 +3,7 @@
 package com.stroexd.hsdecktracker.ui.tracker
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -110,7 +111,11 @@ fun TrackerPanel(
                 )
                 Text(
                     listOfNotNull(
-                        stringResource(R.string.tracker_status, state.remainingCount, state.initialCount, state.turn),
+                        if (compact) {
+                            stringResource(R.string.tracker_status_short, state.remainingCount, state.initialCount, state.turn)
+                        } else {
+                            stringResource(R.string.tracker_status, state.remainingCount, state.initialCount, state.turn)
+                        },
                         state.wentFirst?.let { stringResource(if (it) R.string.went_first_short else R.string.coin_short) },
                         if (state.autoTracked) stringResource(R.string.auto_short) else null,
                     ).joinToString(" · "),
@@ -118,16 +123,35 @@ fun TrackerPanel(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            SmallIconButton(Icons.Filled.Remove, stringResource(R.string.previous_turn), compact) { onUpdate { it.previousTurn() } }
-            SmallIconButton(Icons.Filled.Add, stringResource(R.string.next_turn), compact) { onUpdate { it.nextTurn() } }
-            SmallIconButton(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo), compact) { onUpdate { it.undoLastDraw() } }
+            // Next to the board there's no room, and recognition keeps turns and draws anyway
+            if (!compact) {
+                SmallIconButton(Icons.Filled.Remove, stringResource(R.string.previous_turn)) { onUpdate { it.previousTurn() } }
+                SmallIconButton(Icons.Filled.Add, stringResource(R.string.next_turn)) { onUpdate { it.nextTurn() } }
+                SmallIconButton(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.undo)) { onUpdate { it.undoLastDraw() } }
+            }
         }
         TabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.deck_with_count, state.remainingCount), fontSize = if (compact) 12.sp else 14.sp) })
+            Tab(
+                selected = tab == 0,
+                onClick = { tab = 0 },
+                text = {
+                    Text(
+                        stringResource(if (compact) R.string.tab_deck_short else R.string.deck_with_count, state.remainingCount),
+                        fontSize = if (compact) 11.sp else 14.sp,
+                        maxLines = 1,
+                    )
+                },
+            )
             Tab(
                 selected = tab == 1,
                 onClick = { tab = 1 },
-                text = { Text(stringResource(R.string.opponent_with_count, state.opponentCards.size), fontSize = if (compact) 12.sp else 14.sp) },
+                text = {
+                    Text(
+                        stringResource(if (compact) R.string.tab_opponent_short else R.string.opponent_with_count, state.opponentCards.size),
+                        fontSize = if (compact) 11.sp else 14.sp,
+                        maxLines = 1,
+                    )
+                },
             )
         }
         Box(Modifier.weight(1f, fill = !compact)) {
@@ -145,34 +169,51 @@ fun TrackerPanel(
 
 @Composable
 private fun ResultButtons(compact: Boolean, onFinish: (MatchResult) -> Unit, onNewGame: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
+    val height = if (compact) 32.dp else 42.dp
+    val fontSize = if (compact) 12.sp else 14.sp
+    val win = @Composable { modifier: Modifier ->
         Button(
             onClick = { onFinish(MatchResult.WIN) },
             colors = ButtonDefaults.buttonColors(containerColor = HsColors.Win.copy(alpha = 0.85f)),
             contentPadding = PaddingValues(horizontal = 8.dp),
-            modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
-        ) { Text(stringResource(R.string.win), fontSize = if (compact) 12.sp else 14.sp) }
+            modifier = modifier.height(height),
+        ) { Text(stringResource(R.string.win), fontSize = fontSize, maxLines = 1) }
+    }
+    val loss = @Composable { modifier: Modifier ->
         Button(
             onClick = { onFinish(MatchResult.LOSS) },
             colors = ButtonDefaults.buttonColors(containerColor = HsColors.Loss.copy(alpha = 0.85f)),
             contentPadding = PaddingValues(horizontal = 8.dp),
-            modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
-        ) { Text(stringResource(R.string.loss), fontSize = if (compact) 12.sp else 14.sp, maxLines = 1) }
+            modifier = modifier.height(height),
+        ) { Text(stringResource(R.string.loss), fontSize = fontSize, maxLines = 1) }
+    }
+    val newGame = @Composable { modifier: Modifier ->
         OutlinedButton(
             onClick = onNewGame,
             contentPadding = PaddingValues(horizontal = 8.dp),
-            modifier = Modifier.height(if (compact) 34.dp else 42.dp),
-        ) { Text(stringResource(R.string.new_game), fontSize = if (compact) 12.sp else 14.sp) }
+            modifier = modifier.height(height),
+        ) { Text(stringResource(R.string.new_game), fontSize = fontSize, maxLines = 1) }
+    }
+    if (compact) {
+        // The overlay column is too narrow for three buttons side by side
+        Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            win(Modifier.fillMaxWidth())
+            loss(Modifier.fillMaxWidth())
+            newGame(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            win(Modifier.weight(1f))
+            loss(Modifier.weight(1f))
+            newGame(Modifier)
+        }
     }
 }
 
 @Composable
-private fun SmallIconButton(icon: ImageVector, description: String, compact: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick, modifier = Modifier.size(if (compact) 32.dp else 44.dp)) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(if (compact) 18.dp else 24.dp))
+private fun SmallIconButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+        Icon(icon, contentDescription = description, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -213,7 +254,8 @@ private fun DeckTab(
                             formatPercent(state.nextDrawChance(entry.dbfId), 0),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(40.dp).padding(start = 4.dp),
+                            fontSize = 10.sp,
+                            modifier = Modifier.width(30.dp).padding(start = 2.dp),
                         )
                     }
                 } else {
@@ -347,9 +389,11 @@ private fun OpponentTab(
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    ClassBadge(state.opponentClass)
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { pickClass = true }) { Text(stringResource(R.string.change)) }
+                    ClassBadge(state.opponentClass, Modifier.clickable { pickClass = true })
+                    if (!compact) {
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { pickClass = true }) { Text(stringResource(R.string.change)) }
+                    }
                 }
             }
         }
@@ -380,7 +424,7 @@ private fun OpponentTab(
                 }) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.add_played_card))
+                    Text(stringResource(if (compact) R.string.add_card_short else R.string.add_played_card))
                 }
             }
         }
@@ -400,7 +444,7 @@ private fun OpponentTab(
         }
         if (state.opponentCards.isNotEmpty()) {
             item(key = "played-header") {
-                Text(stringResource(R.string.played_tap_to_remove), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
+                Text(stringResource(if (compact) R.string.played_short else R.string.played_tap_to_remove), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
             }
             items(state.opponentCards.size, key = { "played-$it" }) { index ->
                 val card = db.byDbfId(state.opponentCards[index])
@@ -422,12 +466,14 @@ private fun OpponentTab(
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 ) {
-                    Column(Modifier.padding(8.dp)) {
-                        Text(
-                            stringResource(if (state.opponentCards.isEmpty()) R.string.most_common_deck else R.string.likely_deck),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    Column(Modifier.padding(if (compact) 6.dp else 8.dp)) {
+                        if (!compact) {
+                            Text(
+                                stringResource(if (state.opponentCards.isEmpty()) R.string.most_common_deck else R.string.likely_deck),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 top.deck.displayName,
@@ -438,7 +484,7 @@ private fun OpponentTab(
                             )
                             top.deck.winRate?.let { Text(formatPercent(it, 0), color = winRateColor(it), style = MaterialTheme.typography.labelMedium) }
                         }
-                        if (state.opponentCards.isNotEmpty()) {
+                        if (!compact && state.opponentCards.isNotEmpty()) {
                             Text(
                                 (
                                     listOf(stringResource(R.string.seen_cards_match, top.matchedCards, top.seenCards)) +
@@ -447,12 +493,14 @@ private fun OpponentTab(
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         }
-                        Text(
-                            stringResource(R.string.still_expected),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
+                        if (!compact) {
+                            Text(
+                                stringResource(R.string.still_expected),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
                 }
             }

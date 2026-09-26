@@ -457,7 +457,6 @@
     <string name="reset_to_default">Reset to default</string>
     <string name="set_manually">set manually</string>
     <string name="opacity">Opacity: %1$d %%</string>
-    <string name="overlay_width">Width: %1$d dp</string>
     <string name="show_draw_odds">Show draw chances</string>
     <string name="start_overlay">Start overlay</string>
     <string name="stop">Stop</string>
@@ -481,7 +480,6 @@
     <string name="overlay_channel">Tracker overlay</string>
     <string name="notification_recognizing">Recognizing games automatically</string>
     <string name="notification_overlay_active">Overlay active</string>
-    <string name="move">Move</string>
     <string name="minimize">Minimize</string>
     <string name="open_app">Open app</string>
     <string name="recognition_debug">%1$s · frame %2$d: %3$s</string>
@@ -545,4 +543,12 @@
     <string name="use_screen_sharing">Use screen sharing</string>
     <string name="show_overlay">Show overlay</string>
     <string name="last_game_saved">Saved: %1$s vs %2$s</string>
+    <string name="tracker_status_short">%1$d/%2$d · T%3$d</string>
+    <string name="tab_deck_short">Deck %1$d</string>
+    <string name="tab_opponent_short">Opp. %1$d</string>
+    <string name="add_card_short">Card</string>
+    <string name="played_short">Played</string>
+    <string name="overlay_side">Overlay side</string>
+    <string name="side_left">Left</string>
+    <string name="side_right">Right</string>
 </resources>

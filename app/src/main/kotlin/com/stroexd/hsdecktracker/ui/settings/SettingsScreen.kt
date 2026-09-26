@@ -70,6 +70,7 @@ import com.stroexd.hsdecktracker.core.data.MetaSourceType
 import com.stroexd.hsdecktracker.core.data.RankRange
 import com.stroexd.hsdecktracker.core.data.TimeRange
 import com.stroexd.hsdecktracker.core.util.formatNumber
+import com.stroexd.hsdecktracker.core.vision.OverlaySide
 import com.stroexd.hsdecktracker.overlay.BackgroundTracker
 import com.stroexd.hsdecktracker.overlay.OverlayLauncher
 import com.stroexd.hsdecktracker.overlay.rememberBackgroundTrackerEnabled
@@ -285,7 +286,6 @@ fun SettingsScreen(navController: NavHostController) {
             item {
                 SettingsCard(stringResource(R.string.overlay)) {
                     var opacity by remember(settings.overlayOpacity) { mutableFloatStateOf(settings.overlayOpacity) }
-                    var width by remember(settings.overlayWidthDp) { mutableFloatStateOf(settings.overlayWidthDp.toFloat()) }
                     Text(stringResource(R.string.opacity, (opacity * 100).toInt()))
                     Slider(
                         value = opacity,
@@ -293,13 +293,16 @@ fun SettingsScreen(navController: NavHostController) {
                         onValueChangeFinished = { update { it.copy(overlayOpacity = opacity) } },
                         valueRange = 0.4f..1f,
                     )
-                    Text(stringResource(R.string.overlay_width, width.toInt()))
-                    Slider(
-                        value = width,
-                        onValueChange = { width = it },
-                        onValueChangeFinished = { update { it.copy(overlayWidthDp = width.toInt()) } },
-                        valueRange = 180f..360f,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.overlay_side), modifier = Modifier.weight(1f))
+                        OverlaySide.entries.forEach { side ->
+                            FilterChip(
+                                selected = settings.overlaySide == side,
+                                onClick = { update { it.copy(overlaySide = side) } },
+                                label = { Text(stringResource(if (side == OverlaySide.LEFT) R.string.side_left else R.string.side_right)) },
+                            )
+                        }
+                    }
                     SwitchRow(
                         title = stringResource(R.string.show_draw_odds),
                         checked = settings.overlayShowOdds,

@@ -2,6 +2,7 @@ package com.stroexd.hsdecktracker.core.data
 
 import com.stroexd.hsdecktracker.core.cards.FormatRules
 import com.stroexd.hsdecktracker.core.collection.CollectionOptions
+import com.stroexd.hsdecktracker.core.vision.OverlaySide
 import kotlinx.serialization.Serializable
 
 enum class MetaSourceType { HSREPLAY, CUSTOM_URL }
@@ -56,7 +57,7 @@ data class AppSettings(
     val metaCustomUrl: String = "",
     val overlayOpacity: Float = 0.92f,
     val overlayShowOdds: Boolean = true,
-    val overlayWidthDp: Int = 230,
+    val overlaySide: OverlaySide = OverlaySide.RIGHT,
     val autoRecordMatches: Boolean = true,
     val backgroundTracking: Boolean = true,
     val showOverlay: Boolean = true,

@@ -44,7 +44,9 @@ Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hil
 - **Akkuschonend:** Aufnahme nur im Takt (Partie ca. 2 Bilder/s, Menü alle 1,5 s), dazwischen ist die Aufnahme
   abgekoppelt; unveränderte Bilder sparen sich die Texterkennung; Pause bei ausgeschaltetem Bildschirm oder im
   Hochformat; im Stromsparmodus bzw. bei Überhitzung automatisch langsamer.
-- Verschiebbares, minimierbares Overlay; jede Erkennung lässt sich per Antippen korrigieren.
+- **Das Overlay sitzt im leeren Rand neben dem Spielfeld** und verdeckt so auf breiten Handys keine Karten: Die Größe
+  richtet sich nach dem Bildschirm, Kamera und abgerundete Ecken bleiben frei, und beim Ziehen rastet es am linken
+  oder rechten Rand ein. Es lässt sich zur Blase minimieren, und jede Erkennung lässt sich per Antippen korrigieren.
 
 ### Sammlung & Herstellen
 - **Aus Hearthstone synchronisieren:** Sammlung im Spiel öffnen und durchblättern – die App liest Kartennamen und

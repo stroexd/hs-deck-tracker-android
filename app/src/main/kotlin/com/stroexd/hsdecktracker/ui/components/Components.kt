@@ -132,6 +132,8 @@ fun CardTile(
     onLongClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    // Overlay rows beside the board: less padding, names may use two small lines
+    val dense = height < 34.dp
     val rarityColor = card?.rarityType?.takeIf { it != Rarity.FREE && it != Rarity.UNKNOWN }?.uiColor
     val clickModifier = if (onClick != null || onLongClick != null) {
         Modifier.combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongClick)
@@ -154,7 +156,7 @@ fun CardTile(
                 .fillMaxHeight()
                 .background(rarityColor ?: Color.Transparent),
         )
-        ManaGem(cost, Modifier.padding(horizontal = 4.dp), size = height * 0.7f)
+        ManaGem(cost, Modifier.padding(horizontal = if (dense) 2.dp else 4.dp), size = height * 0.7f)
         Box(Modifier.weight(1f).fillMaxHeight()) {
             if (card != null) {
                 AsyncImage(
@@ -178,12 +180,16 @@ fun CardTile(
                         ),
                     ),
             )
-            Column(Modifier.align(Alignment.CenterStart).padding(start = 4.dp, end = 8.dp)) {
+            Column(Modifier.align(Alignment.CenterStart).padding(start = if (dense) 2.dp else 4.dp, end = if (dense) 2.dp else 8.dp)) {
                 Text(
                     text = name,
-                    style = if (height < 36.dp) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    style = when {
+                        dense -> MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 11.sp)
+                        height < 36.dp -> MaterialTheme.typography.bodySmall
+                        else -> MaterialTheme.typography.bodyMedium
+                    },
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
+                    maxLines = if (dense) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                     color = if (missing > 0) HsColors.Loss else MaterialTheme.colorScheme.onSurface,
                 )
@@ -200,9 +206,9 @@ fun CardTile(
         Box(
             Modifier
                 .fillMaxHeight()
-                .widthIn(min = 30.dp)
+                .widthIn(min = if (dense) 18.dp else 30.dp)
                 .background(Color.Black.copy(alpha = 0.35f))
-                .padding(horizontal = 6.dp),
+                .padding(horizontal = if (dense) 3.dp else 6.dp),
             contentAlignment = Alignment.Center,
         ) {
             val label = when {
