@@ -476,6 +476,8 @@
     <string name="about">Über</string>
     <string name="about_text">Inoffizielles Fan-Projekt, nicht verbunden mit Blizzard Entertainment, HSReplay.net, HearthSim oder HearthPwn. Hearthstone ist eine Marke von Blizzard Entertainment.</string>
     <string name="language_and_cards">Sprache &amp; Kartendaten</string>
+    <string name="report_problem">Problem melden</string>
+    <string name="suggest_idea">Idee oder Feedback</string>
     <string name="overlay_channel">Tracker-Overlay</string>
     <string name="notification_recognizing">Erkennt Partien automatisch</string>
     <string name="notification_overlay_active">Overlay aktiv</string>

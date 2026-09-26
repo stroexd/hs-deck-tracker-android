@@ -10,4 +10,6 @@ Track your Hearthstone games on the same phone you play on – no PC, no account
 
 Free and open source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android
 
+Feedback and bug reports: https://github.com/stroexd/hs-deck-tracker-android/issues
+
 Unofficial fan project, not affiliated with Blizzard Entertainment, HSReplay.net, HearthSim or HearthPwn. Hearthstone is a trademark of Blizzard Entertainment.

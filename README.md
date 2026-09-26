@@ -123,6 +123,13 @@ Requires Android 8.0 or newer (background tracking: Android 11). For background 
 and turn on "HS Deck Tracker" under Accessibility. If Android shows it greyed out ("restricted setting", mostly after
 installing from the browser): App info → ⋮ → **Allow restricted settings**, then try again.
 
+## Feedback
+
+A card that isn't recognized, a bug or an idea? [Report a problem](https://github.com/stroexd/hs-deck-tracker-android/issues/new?template=problem.yml) or
+[share an idea](https://github.com/stroexd/hs-deck-tracker-android/issues/new?template=idea.yml) – from the app too, under Settings → About. English or German, both are fine. For
+recognition problems a screenshot or a diagnostics recording (Settings → Record diagnostics, then Share diagnostics)
+helps most.
+
 ## Privacy
 
 Full policy: [PRIVACY.md](PRIVACY.md).

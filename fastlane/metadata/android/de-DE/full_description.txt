@@ -10,4 +10,6 @@ Tracke deine Hearthstone-Partien auf demselben Handy, auf dem du spielst – ohn
 
 Kostenlos und Open Source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android
 
+Feedback und Fehlerberichte: https://github.com/stroexd/hs-deck-tracker-android/issues
+
 Inoffizielles Fan-Projekt, nicht verbunden mit Blizzard Entertainment, HSReplay.net, HearthSim oder HearthPwn. Hearthstone ist eine Marke von Blizzard Entertainment.

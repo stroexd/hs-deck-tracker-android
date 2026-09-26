@@ -127,6 +127,13 @@ Benötigt Android 8.0 oder neuer (Hintergrund-Tracking: Android 11). Fürs Hinte
 („eingeschränkte Einstellung“, meist nach der Installation über den Browser): App-Info → ⋮ → **Eingeschränkte
 Einstellungen zulassen**, dann erneut versuchen.
 
+## Feedback
+
+Eine Karte wird nicht erkannt, etwas ist kaputt oder du hast eine Idee? [Problem melden](https://github.com/stroexd/hs-deck-tracker-android/issues/new?template=problem.yml) oder
+[Idee teilen](https://github.com/stroexd/hs-deck-tracker-android/issues/new?template=idea.yml) – auch aus der App unter Einstellungen → Über. Deutsch oder Englisch, beides passt. Bei
+Erkennungsproblemen helfen ein Screenshot oder eine Diagnose-Aufzeichnung am meisten (Einstellungen → Diagnose
+aufzeichnen, danach Diagnose teilen).
+
 ## Datenschutz
 
 Vollständige Richtlinie (Englisch): [PRIVACY.md](PRIVACY.md).
