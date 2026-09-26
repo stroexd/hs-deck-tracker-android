@@ -39,6 +39,7 @@ jobs:
           ls -R "$RUNNER_TEMP/fdroid/repo"
           test -f "$RUNNER_TEMP/fdroid/repo/entry.jar"
           ls "$RUNNER_TEMP"/fdroid/repo/com.stroexd.hsdecktracker_*.apk
+          cmp fastlane/metadata/android/en-US/images/icon.png "$RUNNER_TEMP/fdroid/repo/icons/icon.png"
 
       - name: Upload test reports
         if: failure()

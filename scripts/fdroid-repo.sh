@@ -13,9 +13,9 @@ repo_url=${FDROID_REPO_URL:-https://raw.githubusercontent.com/stroexd/hs-deck-tr
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/repo/icons" "$work/metadata/$app_id"
+mkdir -p "$work/repo" "$work/metadata/$app_id"
 cp "$apk" "$work/repo/"
-cp "$root/fastlane/metadata/android/en-US/images/icon.png" "$work/repo/icons/icon.png"
+cp "$root/fastlane/metadata/android/en-US/images/icon.png" "$work/icon.png"
 # Name, descriptions and icon come from the fastlane texts
 cp -r "$root"/fastlane/metadata/android/* "$work/metadata/$app_id/"
 
