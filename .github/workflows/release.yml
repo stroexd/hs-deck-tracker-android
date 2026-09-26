@@ -142,13 +142,6 @@ jobs:
       - name: F-Droid repository
         run: |
           pipx install fdroidserver==2.4.5
-          # "What's new" in F-Droid: the pull request titles from the release notes
-          changelog=fastlane/metadata/android/en-US/changelogs/$VERSION_CODE.txt
-          mkdir -p "$(dirname "$changelog")"
-          gh release view "v$VERSION" --json body --jq .body \
-            | sed -n 's/^\* \(.*\) by @.* in https.*$/• \1/p' | head -n 6 > "$changelog"
-          [ -s "$changelog" ] || rm "$changelog"
-
           url="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/fdroid/repo"
           FDROID_REPO_URL=$url scripts/fdroid-repo.sh "$RUNNER_TEMP/hs-deck-tracker.apk" "$SIGNING_KEYSTORE" "$RUNNER_TEMP/site"
           fingerprint=$(keytool -exportcert -alias fdroid -keystore "$SIGNING_KEYSTORE" -storepass:env SIGNING_PASSWORD \
