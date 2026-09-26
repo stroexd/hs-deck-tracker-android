@@ -1,6 +1,6 @@
 Tracke deine Hearthstone-Partien auf demselben Handy, auf dem du spielst – ohne PC, ohne Konto.
 
-• Overlay über dem Spiel: was noch im Deck ist, Ziehwahrscheinlichkeiten, gespielte Karten des Gegners und sein vermutetes Deck
+• Overlay im leeren Rand neben dem Spielfeld: was noch im Deck ist, Ziehwahrscheinlichkeiten, gespielte Karten des Gegners und sein vermutetes Deck
 • Automatische Erkennung von Spielstart, beiden Klassen, deinem Deck, gezogenen Karten, Zügen und Ergebnis – auf dem Gerät, nichts wird hochgeladen
 • Match-History mit Zugverlauf, Siegquoten pro Deck und Matchup, Serien
 • Deine Sammlung: aus Hearthstones Sammlungsbildschirm synchronisieren; geöffnete Packungen, hergestellte und entzauberte Karten werden automatisch nachgeführt

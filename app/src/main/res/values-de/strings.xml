@@ -456,7 +456,6 @@
     <string name="reset_to_default">Auf Voreinstellung zurücksetzen</string>
     <string name="set_manually">manuell festgelegt</string>
     <string name="opacity">Transparenz: %1$d %%</string>
-    <string name="overlay_width">Breite: %1$d dp</string>
     <string name="show_draw_odds">Ziehwahrscheinlichkeit anzeigen</string>
     <string name="start_overlay">Overlay starten</string>
     <string name="stop">Beenden</string>
@@ -480,7 +479,6 @@
     <string name="overlay_channel">Tracker-Overlay</string>
     <string name="notification_recognizing">Erkennt Partien automatisch</string>
     <string name="notification_overlay_active">Overlay aktiv</string>
-    <string name="move">Verschieben</string>
     <string name="minimize">Minimieren</string>
     <string name="open_app">App öffnen</string>
     <string name="recognition_debug">%1$s · Bild %2$d: %3$s</string>
@@ -544,4 +542,12 @@
     <string name="use_screen_sharing">Bildschirmfreigabe nutzen</string>
     <string name="show_overlay">Overlay anzeigen</string>
     <string name="last_game_saved">Gespeichert: %1$s gegen %2$s</string>
+    <string name="tracker_status_short">%1$d/%2$d · Z%3$d</string>
+    <string name="tab_deck_short">Deck %1$d</string>
+    <string name="tab_opponent_short">Gegn. %1$d</string>
+    <string name="add_card_short">Karte</string>
+    <string name="played_short">Gespielt</string>
+    <string name="overlay_side">Overlay-Seite</string>
+    <string name="side_left">Links</string>
+    <string name="side_right">Rechts</string>
 </resources>

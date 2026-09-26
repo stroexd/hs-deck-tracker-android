@@ -1,6 +1,6 @@
 Track your Hearthstone games on the same phone you play on – no PC, no account.
 
-• Overlay on top of the game: what's left in your deck, draw chances, your opponent's played cards and the likely opponent deck
+• Overlay in the empty margin next to the board: what's left in your deck, draw chances, your opponent's played cards and the likely opponent deck
 • Automatic recognition of game start, both classes, your deck, drawn cards, turns and the result – on the device, nothing is uploaded
 • Match history with turn timeline, win rates per deck and matchup, streaks
 • Your collection: sync it from Hearthstone's collection screen; opened packs, crafted and disenchanted cards are followed automatically
