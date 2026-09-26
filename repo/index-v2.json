@@ -1,0 +1,125 @@
+{
+  "repo": {
+    "name": {
+      "en-US": "HS Deck Tracker"
+    },
+    "description": {
+      "en-US": "Releases of HS Deck Tracker, a deck tracker for Hearthstone on Android. Built from https://github.com/stroexd/hs-deck-tracker-android by its release workflow."
+    },
+    "icon": {
+      "en-US": {
+        "name": "/icons/icon.png",
+        "sha256": "c0cc0edcede5b0d92cb942afc8d89cc234f143f4f581d831c5b04c2656c31da3",
+        "size": 15887
+      }
+    },
+    "address": "https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo",
+    "timestamp": 1790415093000,
+    "categories": {
+      "Games": {
+        "name": {
+          "en-US": "Games"
+        }
+      }
+    }
+  },
+  "packages": {
+    "com.stroexd.hsdecktracker": {
+      "metadata": {
+        "added": 1790415093000,
+        "categories": [
+          "Games"
+        ],
+        "changelog": "https://github.com/stroexd/hs-deck-tracker-android/releases",
+        "issueTracker": "https://github.com/stroexd/hs-deck-tracker-android/issues",
+        "lastUpdated": 1790415093000,
+        "license": "GPL-3.0-only",
+        "sourceCode": "https://github.com/stroexd/hs-deck-tracker-android",
+        "authorName": "stroexd",
+        "name": {
+          "de-DE": "HS Deck Tracker",
+          "en-US": "HS Deck Tracker"
+        },
+        "summary": {
+          "de-DE": "Deck-Tracker, Sammlung und Meta-Decks für Hearthstone – alles auf dem Handy",
+          "en-US": "Deck tracker, collection and meta decks for Hearthstone – all on your phone"
+        },
+        "description": {
+          "de-DE": "Tracke deine Hearthstone-Partien auf demselben Handy, auf dem du spielst – ohne PC, ohne Konto.\n\n• Overlay im leeren Rand neben dem Spielfeld: was noch im Deck ist, Ziehwahrscheinlichkeiten, gespielte Karten des Gegners und sein vermutetes Deck\n• Automatische Erkennung von Spielstart, beiden Klassen, deinem Deck, gezogenen Karten, Zügen und Ergebnis – auf dem Gerät, nichts wird hochgeladen\n• Match-History mit Zugverlauf, Siegquoten pro Deck und Matchup, Serien\n• Deine Sammlung: aus Hearthstones Sammlungsbildschirm synchronisieren; geöffnete Packungen, hergestellte und entzauberte Karten werden automatisch nachgeführt\n• Fehlende Karten und Arkanstaub-Kosten für jedes Deck, günstigste Meta-Decks für deine Sammlung, die lohnendsten Herstellungen\n• Meta-Decks von HSReplay.net, Deckbauer, Deck-Codes, Kartendatenbank\n• Deutsch und Englisch, folgt deiner Hearthstone-Sprache; neue Sets kommen ohne App-Update\n\nKostenlos und Open Source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android\n\nFeedback und Fehlerberichte: https://github.com/stroexd/hs-deck-tracker-android/issues\n\nInoffizielles Fan-Projekt, nicht verbunden mit Blizzard Entertainment, HSReplay.net, HearthSim oder HearthPwn. Hearthstone ist eine Marke von Blizzard Entertainment.\n",
+          "en-US": "Track your Hearthstone games on the same phone you play on – no PC, no account.\n\n• Overlay in the empty margin next to the board: what's left in your deck, draw chances, your opponent's played cards and the likely opponent deck\n• Automatic recognition of game start, both classes, your deck, drawn cards, turns and the result – on the device, nothing is uploaded\n• Match history with turn timeline, win rates per deck and matchup, streaks\n• Your collection: sync it from Hearthstone's collection screen; opened packs, crafted and disenchanted cards are followed automatically\n• Missing cards and Arcane Dust cost for every deck, cheapest meta decks for your collection, the most useful crafts\n• Meta decks from HSReplay.net, deck builder, deck codes, card database\n• English and German, follows your Hearthstone language; new sets arrive without an app update\n\nFree and open source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android\n\nFeedback and bug reports: https://github.com/stroexd/hs-deck-tracker-android/issues\n\nUnofficial fan project, not affiliated with Blizzard Entertainment, HSReplay.net, HearthSim or HearthPwn. Hearthstone is a trademark of Blizzard Entertainment.\n"
+        },
+        "icon": {
+          "en-US": {
+            "name": "/com.stroexd.hsdecktracker/en-US/icon_FdD51TCpj9igX6MhSJWhKfwNs8wVLjWlIdaPywHdxJY=.png",
+            "sha256": "15d0f9d530a98fd8a05fa3214895a129fc0db3cc152e35a521d68fcb01ddc496",
+            "size": 15868
+          }
+        },
+        "preferredSigner": "5920db66d1179cf94eee8e32960e2f674ed2f7470742f2635486b3f9783937dd"
+      },
+      "versions": {
+        "1421d3fdd923ba914fe21ede5f250275aa7c645daab59fcdd2ddb140e4a7e8d4": {
+          "added": 1790415093000,
+          "file": {
+            "name": "/com.stroexd.hsdecktracker_10300.apk",
+            "sha256": "1421d3fdd923ba914fe21ede5f250275aa7c645daab59fcdd2ddb140e4a7e8d4",
+            "size": 22115973
+          },
+          "manifest": {
+            "nativecode": [
+              "arm64-v8a",
+              "armeabi-v7a"
+            ],
+            "versionName": "1.3.0",
+            "versionCode": 10300,
+            "usesSdk": {
+              "minSdkVersion": 26,
+              "targetSdkVersion": 36
+            },
+            "signer": {
+              "sha256": [
+                "5920db66d1179cf94eee8e32960e2f674ed2f7470742f2635486b3f9783937dd"
+              ]
+            },
+            "usesPermission": [
+              {
+                "name": "android.permission.INTERNET"
+              },
+              {
+                "name": "android.permission.SYSTEM_ALERT_WINDOW"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+              },
+              {
+                "name": "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
+              },
+              {
+                "name": "android.permission.POST_NOTIFICATIONS"
+              },
+              {
+                "name": "com.stroexd.hsdecktracker.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+              },
+              {
+                "name": "android.permission.ACCESS_NETWORK_STATE"
+              }
+            ]
+          },
+          "antiFeatures": {
+            "NonFreeComp": {
+              "de-DE": "Nutzt Googles ML Kit, um den Bildschirm auf dem Gerät zu lesen.",
+              "en-US": "Uses Google's ML Kit to read the screen on the device."
+            },
+            "NonFreeNet": {
+              "de-DE": "Lädt Meta-Statistiken von HSReplay.net.",
+              "en-US": "Loads meta statistics from HSReplay.net."
+            }
+          }
+        }
+      }
+    }
+  }
+}

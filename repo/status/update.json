@@ -1,0 +1,47 @@
+{
+  "/etc/issue.net": "Ubuntu 24.04.5 LTS",
+  "antiFeatures": {
+    "NonFreeComp": {
+      "apps": [
+        "com.stroexd.hsdecktracker"
+      ]
+    },
+    "NonFreeNet": {
+      "apps": [
+        "com.stroexd.hsdecktracker"
+      ]
+    }
+  },
+  "apksigner": "/usr/local/lib/android/sdk/build-tools/37.0.0/apksigner",
+  "archivePolicy0": [],
+  "commandLine": [
+    "/opt/pipx_bin/fdroid update",
+    "--rename-apks",
+    "--pretty"
+  ],
+  "disabled": [],
+  "endTimestamp": 1790415095950,
+  "failedBuilds": {},
+  "jarsigner": "/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-1/x64/bin/jarsigner",
+  "keytool": "/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.20-1/x64/bin/keytool",
+  "needsUpdate": [
+    "com.stroexd.hsdecktracker"
+  ],
+  "noPackages": [
+    "com.stroexd.hsdecktracker"
+  ],
+  "noUpdateCheck": [
+    "com.stroexd.hsdecktracker"
+  ],
+  "stages": {
+    "delete_disabled_builds": 1790415093256,
+    "index.make repo": 1790415093615,
+    "prepare_apps repo": 1790415093590,
+    "process_apks": 1790415093256,
+    "read_added_date_from_all_apks": 1790415093590,
+    "remove_apks": 1790415093589,
+    "scan_repo_files": 1790415093589
+  },
+  "startTimestamp": 1790415093000,
+  "subcommand": "update"
+}

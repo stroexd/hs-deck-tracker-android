@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<fdroid>
+	<repo icon="icon.png" name="HS Deck Tracker" pubkey="308204ff308202e7a00302010202084befc5f3d3cf522b300d06092a864886f70d01010c0500302d312b3029060355040313224853204465636b20547261636b657220462d44726f6964207265706f7369746f72793020170d3236303932363039323931345a180f32303534303231313039323931345a302d312b3029060355040313224853204465636b20547261636b657220462d44726f6964207265706f7369746f727930820222300d06092a864886f70d01010105000382020f003082020a0282020100b31ec23a7b1d7790079ecd210b2fbfb5c67ab2652474298c470ed15b58e7b52bcd322d95e8cc12d910e563cc081a537de9664ad58731ab9ee2fc3808680b83f52d8d3455fd5c8c3a36546fbbc782eeb06d5cf73d33fb8d63c008df70e7e6379bf4e0f6269a7faac85c84d06ac0d566508f81576bb1534d88772aad4cf219f52b8318417f35e56dd2d506b6ec9b80d4f7e74888b9f4f1e54e82e652da8962843613278a0155460881d4fd085b3100a0f6207c8935a86322a7198053605a5217c28a93c26c2ca168c22a4db6a524cf14f6f9f0f63f1e423948c083d7891c54254c415c730ca3a77f1bcc33c56f3d22d2c9b48a2c721b01b08058482506cd56485f05a10d19ebb09d52dbab1fe872def749a743ea391e54caaef3370260a2928f02c221873f77b9dcfeb341e2690c9237d2da87da8287f29503e94cf966efc811bcf57e68cb26f923a85dac449888b32602314dae7c1d1dcaccdb64baf41053542772349e1768ecc17ea09d7f42f3becd6c3f24b8ca76f0f133fed06d960c2814bd24cfbac88816d8f5b7c33aa163ecf53b65e89902336a8a8fdd09fa9420d052f8326ba7c0a2c3625759889ff25398555a5bffbe6b28745d58016174c6d4f8b55cd3cf0431931fc3e63ef508e1e0d4e2c84713f4353dc8bad2bc832b87c0baf5dfc5905f5d52116d6d226ec44f0a4848bc3b2a3bf5ee4e86b5148a985b5f0d86eb0203010001a321301f301d0603551d0e04160414da5b7ccc1257752f7e35032ffde83d52821cf805300d06092a864886f70d01010c050003820201009b50f97bdd867d281b8779566b93d7ae7331fc879a9e20e3d6bbc44c6561456fc82ed5f722da6ef94d6245b3f0c1a4b07daa62ad52e18f3a3cc956195803c16f90626f094bae1b2182f4f417ff81b9eea43416a2b386ad93533b58bb554cfbf5b2a84714c34d0b9bdfe9dcbad09905eb37ae17bcaaffa67122f7b13863099c71a19efcdfdce6436c44006dd460c0ec735a8acd47f067d340a706b34f25a17fa46bbfe6120f33e87302073db1776e6ce27d92581a05ee1edddbc307480a7809d3d36fbdd5156f65ac7d49cd2ef40922d74f4a081232caf1e4938aa6fd157b187ad7c03287d069fad8ff94563c6a62b02f7e60a1e5fc147c901d25283af7d07cfa2584bfd00a01ec846fa2ad2ba2dedb6c3da4ee69ccfe48c286e68bacf057f70e771363ab29100d1beefda986aefbcbfbe185e8c988a00886b34f238bb50955851cc7556f9d3940fe8e2bf400db8d7933964d7f97117d563f2649437a50d2fd3f0f477825bf92339d6568996fb1c775a338613fe16b985b184ebe4f233701f44144b3897ece4cab2d917f5062fe804a52ccaffebf8508fa949fbdb44ab5a8d9fe52108d37f1a755681499bf89cebb65cbf8104a5711f1674d80aa1b78c41f4f6242cf73e39c973ce8dd8f2ade2eecbd627a78cef6c52cbde2d9243e819212dd2da3133183395f95e650006d410fa5d67fba06ed6b8a9e6a98e47fc3fd292dba95" timestamp="1790415093" url="https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo" version="20002">
+		<description>Releases of HS Deck Tracker, a deck tracker for Hearthstone on Android. Built from https://github.com/stroexd/hs-deck-tracker-android by its release workflow.</description>
+	</repo>
+	<application id="com.stroexd.hsdecktracker">
+		<id>com.stroexd.hsdecktracker</id>
+		<added>2026-09-26</added>
+		<lastupdated>2026-09-26</lastupdated>
+		<name>HS Deck Tracker</name>
+		<summary>Deck tracker, collection and meta decks for Hearthstone – all on your phone</summary>
+		<desc>Track your Hearthstone games on the same phone you play on – no PC, no account.
+
+• Overlay in the empty margin next to the board: what's left in your deck, draw chances, your opponent's played cards and the likely opponent deck
+• Automatic recognition of game start, both classes, your deck, drawn cards, turns and the result – on the device, nothing is uploaded
+• Match history with turn timeline, win rates per deck and matchup, streaks
+• Your collection: sync it from Hearthstone's collection screen; opened packs, crafted and disenchanted cards are followed automatically
+• Missing cards and Arcane Dust cost for every deck, cheapest meta decks for your collection, the most useful crafts
+• Meta decks from HSReplay.net, deck builder, deck codes, card database
+• English and German, follows your Hearthstone language; new sets arrive without an app update
+
+Free and open source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android
+
+Feedback and bug reports: https://github.com/stroexd/hs-deck-tracker-android/issues
+
+Unofficial fan project, not affiliated with Blizzard Entertainment, HSReplay.net, HearthSim or HearthPwn. Hearthstone is a trademark of Blizzard Entertainment.
+</desc>
+		<license>GPL-3.0-only</license>
+		<categories>Games</categories>
+		<category>Games</category>
+		<web></web>
+		<source>https://github.com/stroexd/hs-deck-tracker-android</source>
+		<tracker>https://github.com/stroexd/hs-deck-tracker-android/issues</tracker>
+		<changelog>https://github.com/stroexd/hs-deck-tracker-android/releases</changelog>
+		<author>stroexd</author>
+		<marketversion></marketversion>
+		<marketvercode>10300</marketvercode>
+		<antifeatures>NonFreeComp,NonFreeNet</antifeatures>
+		<package>
+			<version>1.3.0</version>
+			<versioncode>10300</versioncode>
+			<apkname>com.stroexd.hsdecktracker_10300.apk</apkname>
+			<hash type="sha256">1421d3fdd923ba914fe21ede5f250275aa7c645daab59fcdd2ddb140e4a7e8d4</hash>
+			<size>22115973</size>
+			<sdkver>26</sdkver>
+			<targetSdkVersion>36</targetSdkVersion>
+			<added>2026-09-26</added>
+			<sig>d51be70a816fa30dff3b62134705ff0e</sig>
+			<permissions>ACCESS_NETWORK_STATE,FOREGROUND_SERVICE,FOREGROUND_SERVICE_MEDIA_PROJECTION,FOREGROUND_SERVICE_SPECIAL_USE,INTERNET,POST_NOTIFICATIONS,SYSTEM_ALERT_WINDOW,com.stroexd.hsdecktracker.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</permissions>
+			<nativecode>arm64-v8a,armeabi-v7a</nativecode>
+		</package>
+	</application>
+</fdroid>

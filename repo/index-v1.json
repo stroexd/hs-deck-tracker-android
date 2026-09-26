@@ -1,0 +1,104 @@
+{
+  "repo": {
+    "timestamp": 1790415093000,
+    "version": 20002,
+    "name": "HS Deck Tracker",
+    "icon": "icon.png",
+    "address": "https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo",
+    "description": "Releases of HS Deck Tracker, a deck tracker for Hearthstone on Android. Built from https://github.com/stroexd/hs-deck-tracker-android by its release workflow."
+  },
+  "requests": {
+    "install": [],
+    "uninstall": []
+  },
+  "apps": [
+    {
+      "antiFeatures": [
+        "NonFreeComp",
+        "NonFreeNet"
+      ],
+      "authorName": "stroexd",
+      "categories": [
+        "Games"
+      ],
+      "changelog": "https://github.com/stroexd/hs-deck-tracker-android/releases",
+      "suggestedVersionCode": "10300",
+      "issueTracker": "https://github.com/stroexd/hs-deck-tracker-android/issues",
+      "license": "GPL-3.0-only",
+      "sourceCode": "https://github.com/stroexd/hs-deck-tracker-android",
+      "added": 1790415093000,
+      "packageName": "com.stroexd.hsdecktracker",
+      "lastUpdated": 1790415093000,
+      "localized": {
+        "de-DE": {
+          "description": "Tracke deine Hearthstone-Partien auf demselben Handy, auf dem du spielst \u2013 ohne PC, ohne Konto.\n\n\u2022 Overlay im leeren Rand neben dem Spielfeld: was noch im Deck ist, Ziehwahrscheinlichkeiten, gespielte Karten des Gegners und sein vermutetes Deck\n\u2022 Automatische Erkennung von Spielstart, beiden Klassen, deinem Deck, gezogenen Karten, Z\u00fcgen und Ergebnis \u2013 auf dem Ger\u00e4t, nichts wird hochgeladen\n\u2022 Match-History mit Zugverlauf, Siegquoten pro Deck und Matchup, Serien\n\u2022 Deine Sammlung: aus Hearthstones Sammlungsbildschirm synchronisieren; ge\u00f6ffnete Packungen, hergestellte und entzauberte Karten werden automatisch nachgef\u00fchrt\n\u2022 Fehlende Karten und Arkanstaub-Kosten f\u00fcr jedes Deck, g\u00fcnstigste Meta-Decks f\u00fcr deine Sammlung, die lohnendsten Herstellungen\n\u2022 Meta-Decks von HSReplay.net, Deckbauer, Deck-Codes, Kartendatenbank\n\u2022 Deutsch und Englisch, folgt deiner Hearthstone-Sprache; neue Sets kommen ohne App-Update\n\nKostenlos und Open Source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android\n\nFeedback und Fehlerberichte: https://github.com/stroexd/hs-deck-tracker-android/issues\n\nInoffizielles Fan-Projekt, nicht verbunden mit Blizzard Entertainment, HSReplay.net, HearthSim oder HearthPwn. Hearthstone ist eine Marke von Blizzard Entertainment.\n",
+          "name": "HS Deck Tracker",
+          "summary": "Deck-Tracker, Sammlung und Meta-Decks f\u00fcr Hearthstone \u2013 alles auf dem Handy"
+        },
+        "en-US": {
+          "description": "Track your Hearthstone games on the same phone you play on \u2013 no PC, no account.\n\n\u2022 Overlay in the empty margin next to the board: what's left in your deck, draw chances, your opponent's played cards and the likely opponent deck\n\u2022 Automatic recognition of game start, both classes, your deck, drawn cards, turns and the result \u2013 on the device, nothing is uploaded\n\u2022 Match history with turn timeline, win rates per deck and matchup, streaks\n\u2022 Your collection: sync it from Hearthstone's collection screen; opened packs, crafted and disenchanted cards are followed automatically\n\u2022 Missing cards and Arcane Dust cost for every deck, cheapest meta decks for your collection, the most useful crafts\n\u2022 Meta decks from HSReplay.net, deck builder, deck codes, card database\n\u2022 English and German, follows your Hearthstone language; new sets arrive without an app update\n\nFree and open source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android\n\nFeedback and bug reports: https://github.com/stroexd/hs-deck-tracker-android/issues\n\nUnofficial fan project, not affiliated with Blizzard Entertainment, HSReplay.net, HearthSim or HearthPwn. Hearthstone is a trademark of Blizzard Entertainment.\n",
+          "icon": "icon_FdD51TCpj9igX6MhSJWhKfwNs8wVLjWlIdaPywHdxJY=.png",
+          "name": "HS Deck Tracker",
+          "summary": "Deck tracker, collection and meta decks for Hearthstone \u2013 all on your phone",
+          "whatsNew": "\u2022 Projektger\u00fcst: Kernlogik (Deck-Codes, Sammlung, Staubkosten, Tracker, Log-Parser) mit Tests, Android-Modul und CI\n\u2022 Recognition fixes, battery savings, localization and public README\n\u2022 License under GPL-3.0\n\u2022 Collection sync from Hearthstone, packs and crafting follow automatically\n\u2022 Bring new sets in automatically\n\u2022 Background tracking without buttons or prompts, trimmed explanations\n"
+        }
+      }
+    }
+  ],
+  "packages": {
+    "com.stroexd.hsdecktracker": [
+      {
+        "added": 1790415093000,
+        "apkName": "com.stroexd.hsdecktracker_10300.apk",
+        "hash": "1421d3fdd923ba914fe21ede5f250275aa7c645daab59fcdd2ddb140e4a7e8d4",
+        "hashType": "sha256",
+        "minSdkVersion": 26,
+        "nativecode": [
+          "arm64-v8a",
+          "armeabi-v7a"
+        ],
+        "packageName": "com.stroexd.hsdecktracker",
+        "sig": "d51be70a816fa30dff3b62134705ff0e",
+        "signer": "5920db66d1179cf94eee8e32960e2f674ed2f7470742f2635486b3f9783937dd",
+        "size": 22115973,
+        "targetSdkVersion": 36,
+        "uses-permission": [
+          [
+            "android.permission.INTERNET",
+            null
+          ],
+          [
+            "android.permission.SYSTEM_ALERT_WINDOW",
+            null
+          ],
+          [
+            "android.permission.FOREGROUND_SERVICE",
+            null
+          ],
+          [
+            "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+            null
+          ],
+          [
+            "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+            null
+          ],
+          [
+            "android.permission.POST_NOTIFICATIONS",
+            null
+          ],
+          [
+            "com.stroexd.hsdecktracker.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+            null
+          ],
+          [
+            "android.permission.ACCESS_NETWORK_STATE",
+            null
+          ]
+        ],
+        "versionCode": 10300,
+        "versionName": "1.3.0"
+      }
+    ]
+  }
+}
