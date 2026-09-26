@@ -101,14 +101,18 @@ all texts live in `app/src/main/res/values*/strings.xml`.
 
 ## Installation
 
-Every push builds APKs with GitHub Actions: open **Actions → Android CI → latest run** and download the
-`hs-deck-tracker-apk` artifact. Unzip it and install `app-release.apk` (allow installing from unknown sources).
+Download the APK from the latest [GitHub release](https://github.com/stroexd/hs-deck-tracker-android/releases) and
+install it (allow installing from unknown sources). Releases are signed with the same key, so updates install over
+the previous version. A Google Play version is being prepared; it tracks via screen sharing only, because Play
+restricts accessibility services.
 
 Requires Android 8.0 or newer (background tracking: Android 11). For background tracking tap **Set up** in the app
 and turn on "HS Deck Tracker" under Accessibility. If Android shows it greyed out ("restricted setting", because the
 APK doesn't come from an app store): App info → ⋮ → **Allow restricted settings**, then try again.
 
 ## Privacy
+
+Full policy: [PRIVACY.md](PRIVACY.md).
 
 - The accessibility service only reads which app is in front and takes screenshots only while Hearthstone is; it
   never reads the content of other apps.
@@ -128,7 +132,7 @@ APK doesn't come from an app store): App info → ⋮ → **Allow restricted set
 | Module | Contents |
 |---|---|
 | `core/` | Pure Kotlin/JVM: deck code codec, card database, collection import, crafting, meta parsing, opponent prediction, statistics, persistence and the screen recognition state machine (`vision/`) |
-| `app/` | Android app: Jetpack Compose + Material 3 UI, overlay service, MediaProjection capture and ML Kit text recognition |
+| `app/` | Android app: Jetpack Compose + Material 3 UI, overlay, screen capture (screen sharing or accessibility screenshots) and ML Kit text recognition; flavors `github` and `play` |
 
 The recognition logic lives in `core` and is tested without a device. With diagnostics enabled the app records a
 session (recognized text per frame); such a session can be replayed on the desktop:
@@ -140,6 +144,8 @@ HS_DIAG_DIR=<session dir> HS_CARDS_DIR=<dir with cards.enUS.json / cards.deDE.js
 ## License
 
 HS Deck Tracker is free software, licensed under the [GNU General Public License v3.0](LICENSE).
+
+Releases are built by GitHub Actions, see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Credits & disclaimer
 

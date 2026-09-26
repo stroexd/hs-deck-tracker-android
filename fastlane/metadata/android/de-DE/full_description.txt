@@ -1,0 +1,13 @@
+Tracke deine Hearthstone-Partien auf demselben Handy, auf dem du spielst – ohne PC, ohne Konto.
+
+• Overlay über dem Spiel: was noch im Deck ist, Ziehwahrscheinlichkeiten, gespielte Karten des Gegners und sein vermutetes Deck
+• Automatische Erkennung von Spielstart, beiden Klassen, deinem Deck, gezogenen Karten, Zügen und Ergebnis – auf dem Gerät, nichts wird hochgeladen
+• Match-History mit Zugverlauf, Siegquoten pro Deck und Matchup, Serien
+• Deine Sammlung: aus Hearthstones Sammlungsbildschirm synchronisieren; geöffnete Packungen, hergestellte und entzauberte Karten werden automatisch nachgeführt
+• Fehlende Karten und Arkanstaub-Kosten für jedes Deck, günstigste Meta-Decks für deine Sammlung, die lohnendsten Herstellungen
+• Meta-Decks von HSReplay.net, Deckbauer, Deck-Codes, Kartendatenbank
+• Deutsch und Englisch, folgt deiner Hearthstone-Sprache; neue Sets kommen ohne App-Update
+
+Kostenlos und Open Source (GPL-3.0): https://github.com/stroexd/hs-deck-tracker-android
+
+Inoffizielles Fan-Projekt, nicht verbunden mit Blizzard Entertainment, HSReplay.net, HearthSim oder HearthPwn. Hearthstone ist eine Marke von Blizzard Entertainment.
