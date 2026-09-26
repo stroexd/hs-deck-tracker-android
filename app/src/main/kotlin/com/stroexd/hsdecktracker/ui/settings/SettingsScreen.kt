@@ -61,7 +61,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.stroexd.hsdecktracker.BuildConfig
 import com.stroexd.hsdecktracker.R
-import com.stroexd.hsdecktracker.core.cards.CardSets
 import com.stroexd.hsdecktracker.core.data.AppSettings
 import com.stroexd.hsdecktracker.core.data.Backup
 import com.stroexd.hsdecktracker.core.data.BackupData
@@ -255,8 +254,8 @@ fun SettingsScreen(navController: NavHostController) {
                             Text(stringResource(R.string.which_sets_standard))
                             Text(
                                 stringResource(
-                                    R.string.standard_sets_hint,
-                                    cardState.db.sets.filter { settings.formatRules.isStandardSet(it) }.joinToString { CardSets.displayName(it) },
+                                    if (settings.detectedStandardSets.isEmpty()) R.string.standard_sets_hint else R.string.standard_sets_detected,
+                                    cardState.db.sets.filter { settings.formatRules.isStandardSet(it) }.joinToString { cardState.db.setName(it) },
                                 ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -272,7 +271,7 @@ fun SettingsScreen(navController: NavHostController) {
             if (showSets) {
                 items(cardState.db.sets, key = { "set-$it" }) { set ->
                     SwitchRow(
-                        title = CardSets.displayName(set),
+                        title = cardState.db.setName(set),
                         subtitle = if (set in settings.standardSetOverrides) stringResource(R.string.set_manually) else null,
                         checked = settings.formatRules.isStandardSet(set),
                         onChange = { v -> update { it.copy(standardSetOverrides = it.standardSetOverrides + (set to v)) } },

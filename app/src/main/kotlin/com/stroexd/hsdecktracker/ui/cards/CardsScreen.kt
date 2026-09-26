@@ -60,7 +60,6 @@ import androidx.navigation.NavHostController
 import com.stroexd.hsdecktracker.core.cards.Card
 import com.stroexd.hsdecktracker.core.cards.CardFilter
 import com.stroexd.hsdecktracker.core.cards.CardSearch
-import com.stroexd.hsdecktracker.core.cards.CardSets
 import com.stroexd.hsdecktracker.core.cards.CardType
 import com.stroexd.hsdecktracker.core.cards.GameFormat
 import com.stroexd.hsdecktracker.core.cards.HsClass
@@ -177,6 +176,7 @@ fun CardsScreen(navController: NavHostController) {
             CardFilterSheet(
                 filter = filter,
                 sets = cardState.db.sets,
+                setName = cardState.db::setName,
                 collectionAvailable = !collection.isEmpty,
                 onChange = { transform -> vm.update(transform) },
             )
@@ -217,6 +217,7 @@ fun CardGridItem(card: Card, locale: String, owned: Int?, onClick: () -> Unit) {
 private fun CardFilterSheet(
     filter: CardFilter,
     sets: List<String>,
+    setName: (String) -> String,
     collectionAvailable: Boolean,
     onChange: ((CardFilter) -> CardFilter) -> Unit,
 ) {
@@ -271,7 +272,7 @@ private fun CardFilterSheet(
                 FilterChip(
                     selected = filter.set == set,
                     onClick = { onChange { it.copy(set = if (it.set == set) null else set) } },
-                    label = { Text(CardSets.displayName(set)) },
+                    label = { Text(setName(set)) },
                 )
             }
         }

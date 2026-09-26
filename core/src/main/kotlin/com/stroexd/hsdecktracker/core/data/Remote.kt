@@ -2,6 +2,7 @@ package com.stroexd.hsdecktracker.core.data
 
 import com.stroexd.hsdecktracker.core.cards.CardDatabase
 import com.stroexd.hsdecktracker.core.cards.GameFormat
+import com.stroexd.hsdecktracker.core.cards.SetNames
 import com.stroexd.hsdecktracker.core.meta.DeckListParser
 import com.stroexd.hsdecktracker.core.meta.HsReplayParser
 import com.stroexd.hsdecktracker.core.meta.MetaSnapshot
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -47,6 +50,9 @@ class LoadException(val error: LoadError) : IOException(error.toString())
 
 data class HttpResponse(val code: Int, val body: String)
 
+/** Where a URL leads after redirects, and its ETag or modification date. */
+data class HttpHead(val url: String, val tag: String?)
+
 class HttpClient(private val client: OkHttpClient = defaultClient()) {
     suspend fun get(url: String, headers: Map<String, String> = emptyMap()): HttpResponse = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -62,6 +68,14 @@ class HttpClient(private val client: OkHttpClient = defaultClient()) {
     }
 
     suspend fun getText(url: String, headers: Map<String, String> = emptyMap()): String = get(url, headers).body
+
+    suspend fun head(url: String): HttpHead = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).head().header("User-Agent", USER_AGENT).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw HttpException(response.code)
+            HttpHead(response.request.url.toString(), response.header("ETag") ?: response.header("Last-Modified"))
+        }
+    }
 
     companion object {
         const val USER_AGENT = "HSDeckTracker-Android/1.0 (+https://github.com/stroexd/hs-deck-tracker-android)"
@@ -82,54 +96,90 @@ data class CardDataState(
     val locale: String = "",
 )
 
+/**
+ * Card data from HearthstoneJSON plus set names from Hearthstone's own strings. A cheap check for a new game
+ * build (the "latest" URL redirects to the build) brings new sets in as soon as they are out.
+ */
 class CardRepository(
     private val dir: File,
     private val http: HttpClient,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val withSetNames: Boolean = true,
+    private val cardsUrl: String = CARDS_URL,
+    private val stringsUrl: String = STRINGS_URL,
 ) {
     private val _state = MutableStateFlow(CardDataState())
     val state: StateFlow<CardDataState> = _state.asStateFlow()
     val db: CardDatabase get() = _state.value.db
     private val mutex = Mutex()
+    private var version: String? = null
+    private var lastCheck = 0L
 
     private fun cacheFile(locale: String) = File(dir, "cards_$locale.json")
+    private fun versionFile(locale: String) = File(dir, "cards_$locale.version")
+    private fun setNamesFile(locale: String) = File(dir, "sets_$locale.json")
 
     suspend fun load(locale: String, forceRefresh: Boolean = false) = mutex.withLock {
-        val file = cacheFile(locale)
-        if (_state.value.locale != locale || _state.value.db.isEmpty) {
-            val cached = if (file.exists()) {
-                withContext(Dispatchers.Default) {
-                    runCatching { CardDatabase.parse(file.readText(), locale) }.getOrNull()
-                }
-            } else {
-                null
-            }
-            if (cached != null && !cached.isEmpty) {
-                _state.value = CardDataState(db = cached, lastUpdated = file.lastModified(), locale = locale)
-            }
-        }
+        if (_state.value.locale != locale || _state.value.db.isEmpty) loadCached(locale)
         val current = _state.value
-        val stale = current.locale != locale || current.db.isEmpty ||
-            clock() - (current.lastUpdated ?: 0L) > MAX_AGE_MILLIS
-        if (forceRefresh || stale) download(locale)
+        if (forceRefresh || current.locale != locale || current.db.isEmpty) {
+            lastCheck = clock()
+            download(locale, latestVersion(locale))
+        } else {
+            refreshIfOutdated(locale)
+        }
     }
 
-    private suspend fun download(locale: String) {
+    /** At most every few hours; cheap unless there is a new build. */
+    suspend fun checkForUpdate() = mutex.withLock {
+        val locale = _state.value.locale
+        if (locale.isNotEmpty()) refreshIfOutdated(locale)
+    }
+
+    private suspend fun refreshIfOutdated(locale: String) {
+        if (clock() - lastCheck < CHECK_INTERVAL_MILLIS) return
+        lastCheck = clock()
+        val latest = latestVersion(locale)
+        val outdated = if (latest != null) latest != version else clock() - (_state.value.lastUpdated ?: 0L) > MAX_AGE_MILLIS
+        val db = _state.value.db
+        when {
+            outdated -> download(locale, latest)
+            // The strings sometimes name a new set a little later than the cards arrive
+            withSetNames && db.sets.any { !db.hasSetName(it) } -> fetchSetNames(locale, db)?.let { names ->
+                saveSetNames(locale, names)
+                _state.update { it.copy(db = db.withSetNames(names)) }
+            }
+        }
+    }
+
+    private suspend fun latestVersion(locale: String): String? = runCatching {
+        val head = http.head(cardsUrl.format(locale))
+        buildNumber.find(head.url)?.groupValues?.get(1) ?: head.tag
+    }.getOrNull()
+
+    private suspend fun loadCached(locale: String) = withContext(Dispatchers.IO) {
+        val file = cacheFile(locale)
+        val cached = if (file.exists()) runCatching { CardDatabase.parse(file.readText(), locale) }.getOrNull() else null
+        if (cached == null || cached.isEmpty) return@withContext
+        version = versionFile(locale).takeIf { it.exists() }?.readText()?.trim()?.ifEmpty { null }
+        _state.value = CardDataState(db = cached.withSetNames(cachedSetNames(locale)), lastUpdated = file.lastModified(), locale = locale)
+    }
+
+    private suspend fun download(locale: String, latest: String?) {
         _state.update { it.copy(loading = true, error = null) }
         try {
-            val json = http.getText(CARDS_URL.format(locale))
-            val db = withContext(Dispatchers.Default) { CardDatabase.parse(json, locale) }
-            if (db.isEmpty) throw LoadException(LoadError.NoData)
+            val json = http.getText(cardsUrl.format(locale))
+            val parsed = withContext(Dispatchers.Default) { CardDatabase.parse(json, locale) }
+            if (parsed.isEmpty) throw LoadException(LoadError.NoData)
+            val names = (if (withSetNames) fetchSetNames(locale, parsed) else null) ?: cachedSetNames(locale)
             withContext(Dispatchers.IO) {
                 dir.mkdirs()
-                val tmp = File(dir, "cards_$locale.json.tmp")
-                tmp.writeText(json)
-                if (!tmp.renameTo(cacheFile(locale))) {
-                    cacheFile(locale).delete()
-                    tmp.renameTo(cacheFile(locale))
-                }
+                writeAtomically(cacheFile(locale), json)
+                saveSetNames(locale, names)
+                versionFile(locale).writeText(latest.orEmpty())
             }
-            _state.value = CardDataState(db = db, loading = false, lastUpdated = clock(), locale = locale)
+            version = latest
+            _state.value = CardDataState(db = parsed.withSetNames(names), loading = false, lastUpdated = clock(), locale = locale)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -137,9 +187,37 @@ class CardRepository(
         }
     }
 
+    /** Without them sets keep their built-in names, so failures only cost the translation. */
+    private suspend fun fetchSetNames(locale: String, db: CardDatabase): Map<String, String>? = runCatching {
+        val strings = SetNames.parseStrings(http.getText(stringsUrl.format(locale)))
+        withContext(Dispatchers.Default) { SetNames.resolve(strings, db.deckCards) }
+    }.getOrNull()?.takeIf { it.isNotEmpty() }
+
+    private fun cachedSetNames(locale: String): Map<String, String> = runCatching {
+        AppJson.decodeFromString(setNamesSerializer, setNamesFile(locale).readText())
+    }.getOrDefault(emptyMap())
+
+    private suspend fun saveSetNames(locale: String, names: Map<String, String>) = withContext(Dispatchers.IO) {
+        dir.mkdirs()
+        writeAtomically(setNamesFile(locale), AppJson.encodeToString(setNamesSerializer, names))
+    }
+
+    private fun writeAtomically(file: File, text: String) {
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        tmp.writeText(text)
+        if (!tmp.renameTo(file)) {
+            file.delete()
+            tmp.renameTo(file)
+        }
+    }
+
     companion object {
         const val CARDS_URL = "https://api.hearthstonejson.com/v1/latest/%s/cards.collectible.json"
+        const val STRINGS_URL = "https://raw.githubusercontent.com/HearthSim/hsdata/master/Strings/%s/GLOBAL.txt"
+        private const val CHECK_INTERVAL_MILLIS = 6L * 60 * 60 * 1000
         private const val MAX_AGE_MILLIS = 3L * 24 * 60 * 60 * 1000
+        private val buildNumber = Regex("/v1/(\\d+)/")
+        private val setNamesSerializer = MapSerializer(String.serializer(), String.serializer())
 
         fun renderUrl(cardId: String, locale: String, size: Int = 256) =
             "https://art.hearthstonejson.com/v1/render/latest/$locale/${size}x/$cardId.png"

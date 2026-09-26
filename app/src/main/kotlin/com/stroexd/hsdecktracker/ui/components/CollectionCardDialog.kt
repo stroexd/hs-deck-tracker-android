@@ -54,6 +54,7 @@ fun CollectionCardDialog(
     CardDetailDialog(
         card = card,
         locale = cardState.db.locale,
+        setName = cardState.db.setName(card.set),
         onDismiss = onDismiss,
         owned = owned.total,
         onOwnedChange = { newTotal ->

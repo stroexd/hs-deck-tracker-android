@@ -460,7 +460,8 @@
     <string name="custom_url_hint">Z. B. ein GitHub-Gist (Raw-Link) mit Deck-Codes. Zeilen „### Name“ vor einem Code werden als Deckname verwendet.</string>
     <string name="standard_format">Standard-Format</string>
     <string name="which_sets_standard">Welche Sets sind Standard?</string>
-    <string name="standard_sets_hint">Nach einer Rotation hier anpassen. Standard: %1$s</string>
+    <string name="standard_sets_hint">Eingebaute Liste, bis Meta-Daten geladen sind. Standard: %1$s</string>
+    <string name="standard_sets_detected">Erkannt an den Sets, die aktuelle Standard-Decks spielen – folgt so jeder Rotation von selbst. Standard: %1$s</string>
     <string name="reset_to_default">Auf Voreinstellung zurücksetzen</string>
     <string name="set_manually">manuell festgelegt</string>
     <string name="opacity">Transparenz: %1$d %%</string>

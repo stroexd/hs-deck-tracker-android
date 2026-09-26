@@ -176,7 +176,6 @@ data class SetProgress(
     val copiesTotal: Int,
     val dustToComplete: Int,
 ) {
-    val displayName: String get() = CardSets.displayName(set)
     val fraction: Double get() = if (copiesTotal == 0) 1.0 else copiesOwned.toDouble() / copiesTotal
 }
 

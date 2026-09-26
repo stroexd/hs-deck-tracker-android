@@ -103,7 +103,7 @@ fun SetDetailScreen(navController: NavHostController, set: String) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(CardSets.displayName(set)) },
+                title = { Text(cardState.db.setName(set)) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))

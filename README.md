@@ -70,6 +70,10 @@ recognition, so it needs **no root, no Shizuku, no PC and no helper app**.
 ### Card database
 - All collectible cards with images and search by name, text, tribe or keyword
 - Filters for format, class, mana, rarity, type, set and ownership
+- **New sets arrive by themselves:** the app checks for a new game build at start and whenever tracking starts, and
+  loads the new cards right away. Set names come from Hearthstone's own texts in your language, and Standard follows
+  each rotation – detected from the sets current Standard decks play, while brand-new sets count as Standard at once.
+  Single sets can still be switched by hand in the settings.
 
 ### Match history & stats
 - Games grouped by day, full-text search (deck, archetype, opponent card, note) and filters
@@ -105,8 +109,9 @@ Requires Android 8.0 or newer; automatic recognition works best in landscape wit
 
 - Screen content is processed **only on the device** and never stored – unless you turn on the diagnostics mode,
   which keeps recognized texts and a few downscaled screenshots locally until you share or delete them.
-- Network access is limited to downloading card data and images (HearthstoneJSON) and meta statistics (HSReplay.net,
-  or a URL you configure). There is no account, no analytics and no tracking.
+- Network access is limited to downloading card data and images (HearthstoneJSON), set names (HearthSim's copy of the
+  game texts) and meta statistics (HSReplay.net, or a URL you configure). There is no account, no analytics and no
+  tracking.
 
 ## Development
 
@@ -133,7 +138,8 @@ HS Deck Tracker is free software, licensed under the [GNU General Public License
 
 ## Credits & disclaimer
 
-Card data and images: [HearthstoneJSON](https://hearthstonejson.com) by HearthSim.
+Card data and images: [HearthstoneJSON](https://hearthstonejson.com) by HearthSim; set names and menu texts:
+[HearthSim/hsdata](https://github.com/HearthSim/hsdata).
 Meta statistics: [HSReplay.net](https://hsreplay.net) (unofficial use of the public website API).
 
 This is an unofficial fan project and is not affiliated with or endorsed by Blizzard Entertainment, HSReplay.net,

@@ -72,6 +72,10 @@ Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hil
 ### Kartendatenbank
 - Alle sammelbaren Karten mit Bildern, Suche nach Name, Text, Stamm oder Schlüsselwort
 - Filter nach Format, Klasse, Mana, Seltenheit, Typ, Set und Besitz
+- **Neue Sets kommen von selbst:** Die App prüft beim Start und bei jedem Tracking-Start, ob es einen neuen
+  Spiel-Build gibt, und lädt die neuen Karten sofort. Set-Namen stammen aus Hearthstones eigenen Texten in deiner
+  Sprache, und Standard folgt jeder Rotation – erkannt an den Sets, die aktuelle Standard-Decks spielen; brandneue
+  Sets zählen sofort als Standard. Einzelne Sets lassen sich in den Einstellungen weiterhin umschalten.
 
 ### Match-History & Statistik
 - Partien nach Tagen gruppiert, Volltextsuche (Deck, Archetyp, Gegnerkarte, Notiz) und Filter
@@ -108,8 +112,9 @@ Benötigt Android 8.0 oder neuer; die Erkennung funktioniert am besten im Querfo
 
 - Bildschirminhalte werden **nur auf dem Gerät** verarbeitet und nicht gespeichert – außer im Diagnose-Modus, der
   erkannte Texte und einige verkleinerte Bildschirmfotos lokal ablegt, bis du sie teilst oder löschst.
-- Netzwerkzugriffe gibt es nur für Kartendaten und -bilder (HearthstoneJSON) und Meta-Statistiken (HSReplay.net oder
-  eine selbst eingetragene URL). Kein Konto, keine Analyse, kein Tracking.
+- Netzwerkzugriffe gibt es nur für Kartendaten und -bilder (HearthstoneJSON), Set-Namen (HearthSims Kopie der
+  Spieltexte) und Meta-Statistiken (HSReplay.net oder eine selbst eingetragene URL). Kein Konto, keine Analyse, kein
+  Tracking.
 
 ## Entwicklung
 
@@ -136,7 +141,8 @@ HS Deck Tracker ist freie Software unter der [GNU General Public License v3.0](L
 
 ## Quellen & Hinweis
 
-Kartendaten und -bilder: [HearthstoneJSON](https://hearthstonejson.com) von HearthSim.
+Kartendaten und -bilder: [HearthstoneJSON](https://hearthstonejson.com) von HearthSim; Set-Namen und Menütexte:
+[HearthSim/hsdata](https://github.com/HearthSim/hsdata).
 Meta-Statistiken: [HSReplay.net](https://hsreplay.net) (inoffizielle Nutzung der öffentlichen Website-Schnittstelle).
 
 Inoffizielles Fan-Projekt, nicht mit Blizzard Entertainment, HSReplay.net, HearthSim oder HearthPwn verbunden oder
