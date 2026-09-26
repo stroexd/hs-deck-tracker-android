@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,7 +70,9 @@ import com.stroexd.hsdecktracker.core.data.MetaSourceType
 import com.stroexd.hsdecktracker.core.data.RankRange
 import com.stroexd.hsdecktracker.core.data.TimeRange
 import com.stroexd.hsdecktracker.core.util.formatNumber
+import com.stroexd.hsdecktracker.overlay.BackgroundTracker
 import com.stroexd.hsdecktracker.overlay.OverlayLauncher
+import com.stroexd.hsdecktracker.overlay.rememberBackgroundTrackerEnabled
 import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.components.SectionHeader
@@ -78,6 +81,7 @@ import com.stroexd.hsdecktracker.ui.labelRes
 import com.stroexd.hsdecktracker.ui.message
 import com.stroexd.hsdecktracker.ui.readText
 import com.stroexd.hsdecktracker.ui.theme.HsColors
+import com.stroexd.hsdecktracker.ui.tracker.BackgroundSetupDialog
 import com.stroexd.hsdecktracker.ui.writeText
 import com.stroexd.hsdecktracker.vision.DiagnosticsRecorder
 import kotlinx.coroutines.launch
@@ -94,6 +98,11 @@ fun SettingsScreen(navController: NavHostController) {
     val recognition by container.recognition.collectAsStateWithLifecycle()
     var showSets by rememberSaveable { mutableStateOf(false) }
     val gameLocale by container.gameLocale.collectAsStateWithLifecycle()
+    val trackerEnabled = rememberBackgroundTrackerEnabled()
+    var showBackgroundSetup by remember { mutableStateOf(false) }
+    LaunchedEffect(trackerEnabled) {
+        if (trackerEnabled) showBackgroundSetup = false
+    }
     var customUrl by rememberSaveable(settings.metaCustomUrl) { mutableStateOf(settings.metaCustomUrl) }
     var pendingBackup by remember { mutableStateOf<String?>(null) }
 
@@ -172,18 +181,12 @@ fun SettingsScreen(navController: NavHostController) {
                     FilledTonalButton(onClick = { container.refreshCards() }, enabled = !cardState.loading) {
                         Text(stringResource(R.string.update_now))
                     }
-                    Text(
-                        stringResource(R.string.card_data_source),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
             item {
                 SettingsCard(stringResource(R.string.collection_and_dust)) {
                     SwitchRow(
                         title = stringResource(R.string.core_set_owned),
-                        subtitle = stringResource(R.string.core_set_owned_hint),
                         checked = settings.coreSetOwned,
                         onChange = { v -> update { it.copy(coreSetOwned = v) } },
                     )
@@ -315,42 +318,50 @@ fun SettingsScreen(navController: NavHostController) {
             }
             item {
                 SettingsCard(stringResource(R.string.automatic_recognition)) {
-                    Text(
-                        stringResource(R.string.recognition_explained),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    if (BackgroundTracker.isSupported) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(R.string.background_tracking))
+                                Text(
+                                    stringResource(if (trackerEnabled) R.string.background_tracking_ready else R.string.background_tracking_off),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (trackerEnabled) {
+                                Switch(checked = settings.backgroundTracking, onCheckedChange = { v -> update { it.copy(backgroundTracking = v) } })
+                            } else {
+                                FilledTonalButton(onClick = { showBackgroundSetup = true }) { Text(stringResource(R.string.set_up)) }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    }
                     Text(
                         if (recognition.active) {
-                            stringResource(R.string.recognition_status_active, stringResource(recognition.phase.labelRes()), recognition.frames) +
-                                if (recognition.frames > 0) {
-                                    stringResource(R.string.recognition_status_saved, recognition.frames - recognition.ocrFrames)
-                                } else {
-                                    ""
-                                }
+                            stringResource(R.string.recognition_status_active, stringResource(recognition.phase.labelRes()))
                         } else {
                             stringResource(R.string.recognition_status_off)
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = if (recognition.active) HsColors.Win else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    FilledTonalButton(onClick = { startOverlay() }) {
-                        Text(stringResource(if (recognition.active) R.string.open_hearthstone else R.string.play_and_track_button))
-                    }
+                    SwitchRow(
+                        title = stringResource(R.string.show_overlay),
+                        checked = settings.showOverlay,
+                        onChange = { v -> update { it.copy(showOverlay = v) } },
+                    )
                     SwitchRow(
                         title = stringResource(R.string.auto_record),
-                        subtitle = stringResource(R.string.auto_record_hint),
                         checked = settings.autoRecordMatches,
                         onChange = { v -> update { it.copy(autoRecordMatches = v) } },
                     )
                     SwitchRow(
                         title = stringResource(R.string.track_collection),
-                        subtitle = stringResource(R.string.track_collection_hint),
                         checked = settings.trackCollectionChanges,
                         onChange = { v -> update { it.copy(trackCollectionChanges = v) } },
                     )
                     SwitchRow(
                         title = stringResource(R.string.show_recognized_texts),
-                        subtitle = stringResource(R.string.show_recognized_texts_hint),
                         checked = settings.showRecognitionDebug,
                         onChange = { v -> update { it.copy(showRecognitionDebug = v) } },
                     )
@@ -375,10 +386,6 @@ fun SettingsScreen(navController: NavHostController) {
             }
             item {
                 SettingsCard(stringResource(R.string.backup)) {
-                    Text(
-                        stringResource(R.string.backup_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilledTonalButton(onClick = {
                             pendingBackup = Backup.export(
@@ -409,6 +416,9 @@ fun SettingsScreen(navController: NavHostController) {
                 }
             }
         }
+    }
+    if (showBackgroundSetup) {
+        BackgroundSetupDialog(onDismiss = { showBackgroundSetup = false }, onUseScreenSharing = startOverlay)
     }
 }
 

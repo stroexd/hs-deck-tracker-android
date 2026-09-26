@@ -333,7 +333,7 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, action: (@Compos
 fun EmptyState(
     icon: ImageVector,
     title: String,
-    message: String,
+    message: String?,
     modifier: Modifier = Modifier,
     actions: (@Composable () -> Unit)? = null,
 ) {
@@ -344,12 +344,14 @@ fun EmptyState(
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
         Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-        Text(
-            message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        if (message != null) {
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (actions != null) {
             Spacer(Modifier.height(8.dp))
             actions()

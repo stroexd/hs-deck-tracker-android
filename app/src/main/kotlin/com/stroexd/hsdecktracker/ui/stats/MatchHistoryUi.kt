@@ -373,7 +373,7 @@ fun MatchHistoryContent(
                 EmptyState(
                     icon = if (matches.isEmpty()) Icons.Filled.History else Icons.Filled.SearchOff,
                     title = stringResource(if (matches.isEmpty()) R.string.no_games_title else R.string.no_results),
-                    message = stringResource(if (matches.isEmpty()) R.string.no_matches_message else R.string.no_results_hint),
+                    message = stringResource(if (matches.isEmpty()) R.string.no_games_message else R.string.no_results_hint),
                 )
             }
         }

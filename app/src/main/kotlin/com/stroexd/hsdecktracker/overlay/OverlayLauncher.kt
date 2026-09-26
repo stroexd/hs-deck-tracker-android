@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.stroexd.hsdecktracker.R
 import com.stroexd.hsdecktracker.appContainer
@@ -62,10 +64,28 @@ object OverlayLauncher {
     }
 }
 
+/** Whether the tracker's accessibility service is on; checked again whenever the screen returns from Android's settings. */
+@Composable
+fun rememberBackgroundTrackerEnabled(): Boolean {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(BackgroundTracker.isSupported && BackgroundTracker.isEnabled(context)) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        enabled = BackgroundTracker.isSupported && BackgroundTracker.isEnabled(context)
+    }
+    return enabled
+}
+
+@Composable
+fun rememberBackgroundTracking(): Boolean {
+    val settings by LocalContext.current.appContainer.settings.settings.collectAsStateWithLifecycle()
+    return rememberBackgroundTrackerEnabled() && settings.backgroundTracking
+}
+
 @Composable
 fun rememberTrackingStarter(launchGame: Boolean = true): () -> Unit {
     val context = LocalContext.current
     val currentLaunchGame by rememberUpdatedState(launchGame)
+    val background by rememberUpdatedState(rememberBackgroundTracking())
     var waitingForOverlayPermission by remember { mutableStateOf(false) }
 
     val captureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -120,7 +140,9 @@ fun rememberTrackingStarter(launchGame: Boolean = true): () -> Unit {
 
     return remember(context, proceed) {
         {
-            if (!OverlayLauncher.canDrawOverlays(context)) {
+            if (background) {
+                if (!OverlayLauncher.launchHearthstone(context)) context.toast(context.getString(R.string.hearthstone_not_installed))
+            } else if (!OverlayLauncher.canDrawOverlays(context)) {
                 waitingForOverlayPermission = true
                 context.toast(context.getString(R.string.overlay_permission_hint))
                 OverlayLauncher.requestOverlayPermission(context)

@@ -75,6 +75,9 @@ import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.deck.DeckTextParser
 import com.stroexd.hsdecktracker.core.stats.StatsCalculator
 import com.stroexd.hsdecktracker.core.stats.WinRate
+import com.stroexd.hsdecktracker.core.util.formatPercent
+import com.stroexd.hsdecktracker.overlay.BackgroundTracker
+import com.stroexd.hsdecktracker.overlay.rememberBackgroundTracking
 import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.Routes
@@ -94,7 +97,7 @@ import com.stroexd.hsdecktracker.ui.rememberComputed
 import com.stroexd.hsdecktracker.ui.theme.HsColors
 import com.stroexd.hsdecktracker.ui.theme.uiColor
 import com.stroexd.hsdecktracker.ui.theme.winRateColor
-import com.stroexd.hsdecktracker.core.util.formatPercent
+import com.stroexd.hsdecktracker.ui.tracker.BackgroundSetupDialog
 import kotlinx.coroutines.launch
 
 private enum class DeckSort(@StringRes val label: Int) {
@@ -124,6 +127,11 @@ fun DecksScreen(
     val matches by container.matches.matches.collectAsStateWithLifecycle()
     val recognition by container.recognition.collectAsStateWithLifecycle()
     val startTracking = rememberTrackingStarter()
+    val background = rememberBackgroundTracking()
+    var showBackgroundSetup by remember { mutableStateOf(false) }
+    LaunchedEffect(background) {
+        if (background) showBackgroundSetup = false
+    }
 
     var formatFilter by rememberSaveable { mutableStateOf<GameFormat?>(null) }
     var sort by rememberSaveable { mutableStateOf(DeckSort.RECENT) }
@@ -214,9 +222,21 @@ fun DecksScreen(
         ) {
             item {
                 PlayCard(
-                    active = recognition.active,
-                    status = stringResource(recognition.phase.labelRes()),
-                    onPlay = startTracking,
+                    title = stringResource(
+                        when {
+                            background -> R.string.background_tracking_on
+                            recognition.active -> R.string.tracker_active
+                            BackgroundTracker.isSupported -> R.string.track_automatically
+                            else -> R.string.play_and_track
+                        },
+                    ),
+                    subtitle = when {
+                        recognition.active -> stringResource(recognition.phase.labelRes())
+                        background -> stringResource(R.string.just_open_hearthstone)
+                        BackgroundTracker.isSupported -> stringResource(R.string.set_up_once)
+                        else -> null
+                    },
+                    onClick = { if (background || !BackgroundTracker.isSupported) startTracking() else showBackgroundSetup = true },
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 )
             }
@@ -308,6 +328,9 @@ fun DecksScreen(
             },
         )
     }
+    if (showBackgroundSetup) {
+        BackgroundSetupDialog(onDismiss = { showBackgroundSetup = false }, onUseScreenSharing = startTracking)
+    }
     if (showClassPicker) {
         ClassPickerDialog(
             title = stringResource(R.string.choose_class),
@@ -321,9 +344,9 @@ fun DecksScreen(
 }
 
 @Composable
-private fun PlayCard(active: Boolean, status: String, onPlay: () -> Unit, modifier: Modifier = Modifier) {
+private fun PlayCard(title: String, subtitle: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        onClick = onPlay,
+        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
@@ -336,17 +359,10 @@ private fun PlayCard(active: Boolean, status: String, onPlay: () -> Unit, modifi
             )
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(if (active) R.string.tracker_active else R.string.play_and_track),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Text(
-                    if (active) stringResource(R.string.tracker_active_hint, status) else stringResource(R.string.play_and_track_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                if (subtitle != null) {
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
             }
         }
     }
