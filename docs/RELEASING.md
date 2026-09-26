@@ -19,8 +19,8 @@ version it takes the next patch version) or with a tag like `v1.4.0`. The workfl
 1. runs the tests and builds the APK with version code `major·10000 + minor·100 + patch`, signed with the key
    `release`,
 2. publishes a GitHub release with `hs-deck-tracker.apk` and notes generated from the merged pull requests,
-3. rebuilds the F-Droid repository on the `fdroid` branch, signed with the key `fdroid`; its "what's new" text is taken
-   from the release notes.
+3. rebuilds the F-Droid repository on the `fdroid` branch, signed with the key `fdroid`; app stores link to the GitHub
+   release notes as changelog.
 
 ## Channels
 
