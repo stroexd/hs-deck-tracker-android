@@ -1,5 +1,6 @@
 # Publishes a release: the signed APK as a GitHub release and the F-Droid repository on the `fdroid` branch.
-# Run it from the Actions tab (without a version it takes the next patch version) or push a tag like v1.4.0.
+# Starts by itself when a new versionName in app/build.gradle.kts reaches main; it can also be run from the Actions
+# tab (without a version it takes the next patch version) or by pushing a tag like v1.4.0.
 name: Release
 
 on:
@@ -9,6 +10,8 @@ on:
         description: Version like 1.4.0 (empty = next patch version)
         required: false
   push:
+    branches: [ main ]
+    paths: [ app/build.gradle.kts, .github/workflows/release.yml ]
     tags: [ 'v*' ]
 
 permissions:
@@ -17,10 +20,58 @@ permissions:
 concurrency: release
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      code: ${{ steps.version.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          code_of() { IFS=. read -r major minor patch <<< "$1"; echo $((major * 10000 + minor * 100 + patch)); }
+          latest=$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -vx "$GITHUB_REF_NAME" | head -n1)
+          latest=${latest#v}
+          configured=$(grep -oP 'versionName.*\?: "\K[^"]+' app/build.gradle.kts)
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version=${GITHUB_REF_NAME#v}
+          elif [ "$GITHUB_EVENT_NAME" = push ]; then
+            version=$configured
+            if [ -n "$latest" ] && [ "$(code_of "$version")" -le "$(code_of "$latest")" ]; then
+              echo "::notice::$version is already released; raise versionName in app/build.gradle.kts for a new release"
+              exit 0
+            fi
+          elif [ -n "$INPUT_VERSION" ]; then
+            version=${INPUT_VERSION#v}
+          elif [ -n "$latest" ] && [ "$(code_of "$configured")" -le "$(code_of "$latest")" ]; then
+            IFS=. read -r major minor patch <<< "$latest"
+            version="$major.$minor.$((patch + 1))"
+          else
+            version=$configured
+          fi
+          if ! [[ $version =~ ^[0-9]+\.[0-9]{1,2}\.[0-9]{1,2}$ ]]; then
+            echo "::error::Versions look like 1.4.0, got '$version'"; exit 1
+          fi
+          if [ -n "$latest" ] && [ "$(code_of "$version")" -le "$(code_of "$latest")" ]; then
+            echo "::error::$version is not newer than the last release $latest"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "code=$(code_of "$version")" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: version
+    if: needs.version.outputs.version != ''
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      VERSION: ${{ needs.version.outputs.version }}
+      VERSION_CODE: ${{ needs.version.outputs.code }}
       SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
       GH_TOKEN: ${{ github.token }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -35,34 +86,6 @@ jobs:
           java-version: 17
 
       - uses: gradle/actions/setup-gradle@v4
-
-      - name: Version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          code_of() { IFS=. read -r major minor patch <<< "$1"; echo $((major * 10000 + minor * 100 + patch)); }
-          latest=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n1)
-          latest=${latest#v}
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            version=${GITHUB_REF_NAME#v}
-            latest=$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -vx "$GITHUB_REF_NAME" | head -n1)
-            latest=${latest#v}
-          elif [ -n "$INPUT_VERSION" ]; then
-            version=${INPUT_VERSION#v}
-          elif [ -n "$latest" ]; then
-            IFS=. read -r major minor patch <<< "$latest"
-            version="$major.$minor.$((patch + 1))"
-          else
-            version=$(grep -oP 'versionName.*\?: "\K[^"]+' app/build.gradle.kts)
-          fi
-          if ! [[ $version =~ ^[0-9]+\.[0-9]{1,2}\.[0-9]{1,2}$ ]]; then
-            echo "::error::Versions look like 1.4.0, got '$version'"; exit 1
-          fi
-          if [ -n "$latest" ] && [ "$(code_of "$version")" -le "$(code_of "$latest")" ]; then
-            echo "::error::$version is not newer than the last release $latest"; exit 1
-          fi
-          echo "VERSION=$version" >> "$GITHUB_ENV"
-          echo "VERSION_CODE=$(code_of "$version")" >> "$GITHUB_ENV"
 
       - name: Signing keys
         run: |

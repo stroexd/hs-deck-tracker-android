@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -416,6 +417,15 @@ fun SettingsScreen(navController: NavHostController) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    val uriHandler = LocalUriHandler.current
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { uriHandler.openUri(Feedback.problemUrl()) }) {
+                            Text(stringResource(R.string.report_problem))
+                        }
+                        OutlinedButton(onClick = { uriHandler.openUri(Feedback.ideaUrl()) }) {
+                            Text(stringResource(R.string.suggest_idea))
+                        }
+                    }
                 }
             }
         }

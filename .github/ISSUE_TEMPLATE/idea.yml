@@ -1,0 +1,13 @@
+name: Idea or feedback
+description: A feature you miss, something that could be easier, or just what you think
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: English or German, both are fine. / Deutsch oder Englisch, beides passt.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea or feedback
+    validations:
+      required: true
