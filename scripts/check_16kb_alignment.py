@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fails when a 64-bit native library in an APK/AAB isn't aligned for 16 KB memory pages (a Google Play requirement)."""
+"""Fails when a 64-bit native library in an APK isn't aligned for devices with 16 KB memory pages (Android 15+)."""
 import struct
 import sys
 import zipfile

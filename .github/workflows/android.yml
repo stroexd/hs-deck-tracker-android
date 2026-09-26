@@ -23,11 +23,23 @@ jobs:
       - name: Unit tests (core)
         run: ./gradlew --no-daemon :core:test
 
-      - name: Build APK (GitHub) and bundle (Play)
-        run: ./gradlew --no-daemon :app:assembleGithubRelease :app:bundlePlayRelease
+      - name: Build APK
+        run: ./gradlew --no-daemon :app:assembleRelease
 
-      - name: Check 16 KB page alignment (Play)
-        run: python3 scripts/check_16kb_alignment.py app/build/outputs/bundle/playRelease/*.aab
+      - name: Check 16 KB page alignment
+        run: python3 scripts/check_16kb_alignment.py app/build/outputs/apk/release/app-release.apk
+
+      - name: Build the F-Droid repository (throwaway key)
+        run: |
+          pipx install fdroidserver==2.4.5
+          export SIGNING_PASSWORD=$(openssl rand -hex 16)
+          keytool -genkeypair -keystore "$RUNNER_TEMP/test.p12" -storetype PKCS12 -alias fdroid -keyalg RSA \
+            -keysize 2048 -validity 1 -dname "CN=Test" -storepass:env SIGNING_PASSWORD
+          scripts/fdroid-repo.sh app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/test.p12" "$RUNNER_TEMP/fdroid"
+          ls -R "$RUNNER_TEMP/fdroid/repo"
+          test -f "$RUNNER_TEMP/fdroid/repo/entry.jar"
+          ls "$RUNNER_TEMP"/fdroid/repo/com.stroexd.hsdecktracker_*.apk
+          cmp fastlane/metadata/android/en-US/images/icon.png "$RUNNER_TEMP/fdroid/repo/icons/icon.png"
 
       - name: Upload test reports
         if: failure()
@@ -40,5 +52,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hs-deck-tracker-apk
-          path: app/build/outputs/apk/github/release/*.apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error

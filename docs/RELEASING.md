@@ -2,32 +2,38 @@
 
 Everything runs in GitHub Actions, so a release needs nothing but a browser.
 
-## Builds
-
-| Flavor | Output | Differences |
-|---|---|---|
-| `github` | signed APK, attached to GitHub releases | background tracking through the app's accessibility service, bundled text recognition |
-| `play` | signed App Bundle for Google Play | screen sharing only (Play restricts accessibility services), text recognition from Play services |
-
 ## One-time setup
 
-1. Repository → Settings → Secrets and variables → Actions → add `UPLOAD_KEY_PASSWORD` (at least 20 random
-   characters; keep it in a password manager).
-2. Actions → **Create upload key** → Run workflow. It creates the upload key and commits it encrypted as
-   `signing/upload.p12.enc`. The key itself never leaves the workflow unencrypted.
+Repository → Settings → Secrets and variables → Actions → **New repository secret**: `SIGNING_PASSWORD`, at least
+20 random characters. Keep it in a password manager – without it no update can be signed.
+
+The first release creates the signing keys and commits them encrypted with that password as `signing/keys.p12.enc`;
+the keys never leave the workflow unencrypted.
 
 ## Every release
 
-- Push a tag like `v1.3.0` (or run **Release** by hand). The workflow tests, builds both flavors with an increasing
-  version code, checks the 16 KB page alignment Google Play requires and uploads:
-  - `play-bundle`: the `.aab` for the Play Console,
-  - `hs-deck-tracker-apk`: the APK; with a tag it is also attached to a GitHub release.
-- Optional: add `PLAY_SERVICE_ACCOUNT_JSON` (a Play Console service account key) and every release goes to the
-  internal testing track by itself. The very first bundle has to be uploaded by hand in the Play Console.
+Actions → **Release** → Run workflow. Without a version it takes the next patch version; a tag like `v1.4.0` works
+too. The workflow
 
-## Google Play checklist
+1. runs the tests and builds the APK with version code `major·10000 + minor·100 + patch`, signed with the key
+   `release`,
+2. publishes a GitHub release with `hs-deck-tracker.apk` and notes generated from the merged pull requests,
+3. rebuilds the F-Droid repository on the `fdroid` branch, signed with the key `fdroid`; its "what's new" text is taken
+   from the release notes.
 
-- Store texts: `fastlane/metadata/android/*`; privacy policy: `PRIVACY.md`.
-- Declarations in the Play Console: foreground services (`mediaProjection` for screen capture, `specialUse` for the
-  overlay), data safety (no data collected or shared), content rating, target audience.
-- New personal developer accounts need a closed test with at least 12 testers for 14 days before production access.
+## Channels
+
+| Channel | Address | Updates |
+|---|---|---|
+| GitHub | `https://github.com/stroexd/hs-deck-tracker-android/releases/latest/download/hs-deck-tracker.apk` | manual |
+| F-Droid repository | `https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo` (fingerprint on the `fdroid` branch) | F-Droid, Droid-ify, Neo Store |
+| Obtainium | reads the GitHub releases | Obtainium |
+
+Name, descriptions and icon in the F-Droid repository come from `fastlane/metadata/android/`. CI builds the
+repository with a throwaway key on every push, so a broken setup shows up before a release.
+
+## Keys
+
+- `release` signs the APK. Android only installs updates signed with the same key: if the key or the password is
+  lost, users have to uninstall before they can install a new version.
+- `fdroid` signs the repository index; app stores check it against the fingerprint users added.

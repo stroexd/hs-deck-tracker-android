@@ -12,7 +12,6 @@ import android.provider.Settings
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.inputmethod.InputMethodManager
-import com.stroexd.hsdecktracker.BuildConfig
 import com.stroexd.hsdecktracker.appContainer
 import com.stroexd.hsdecktracker.vision.AccessibilityScreenshotSource
 import com.stroexd.hsdecktracker.vision.ScreenRecognizer
@@ -99,7 +98,7 @@ class BackgroundTracker : AccessibilityService() {
     companion object {
         private const val SESSION_TIMEOUT_MS = 10 * 60_000L
 
-        val isSupported: Boolean get() = BuildConfig.BACKGROUND_TRACKING && Build.VERSION.SDK_INT >= 30
+        val isSupported: Boolean get() = Build.VERSION.SDK_INT >= 30
 
         fun isEnabled(context: Context): Boolean {
             val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()

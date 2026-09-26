@@ -15,9 +15,9 @@ android {
         applicationId = "com.stroexd.hsdecktracker"
         minSdk = 26
         targetSdk = 36
-        // The release workflow counts versions up; Play needs a higher code for every upload
-        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 3
-        versionName = providers.gradleProperty("versionName").orNull ?: "1.2.0"
+        // Release builds get both from the release workflow (see docs/RELEASING.md)
+        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 10300
+        versionName = providers.gradleProperty("versionName").orNull ?: "1.3.0"
 
         ndk {
             // ML Kit ships native libraries; real devices are ARM only
@@ -25,31 +25,17 @@ android {
         }
     }
 
-    // Only the release workflow has the upload key; other release builds are signed with the debug key
-    val uploadKeystore = providers.environmentVariable("UPLOAD_KEYSTORE").orNull?.let(::file)?.takeIf { it.exists() }
+    // Only the release workflow has the signing key; other release builds are signed with the debug key
+    val releaseKeystore = providers.environmentVariable("SIGNING_KEYSTORE").orNull?.let(::file)?.takeIf { it.exists() }
     signingConfigs {
-        if (uploadKeystore != null) {
-            create("upload") {
-                storeFile = uploadKeystore
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
                 storeType = "PKCS12"
-                storePassword = providers.environmentVariable("UPLOAD_KEY_PASSWORD").get()
-                keyAlias = "upload"
+                storePassword = providers.environmentVariable("SIGNING_PASSWORD").get()
+                keyAlias = "release"
                 keyPassword = storePassword
             }
-        }
-    }
-
-    flavorDimensions += "store"
-    productFlavors {
-        // Sideloaded APK with everything, including background tracking through the app's accessibility service
-        create("github") {
-            dimension = "store"
-            buildConfigField("boolean", "BACKGROUND_TRACKING", "true")
-        }
-        // Google Play restricts accessibility services, so this build tracks via screen sharing only
-        create("play") {
-            dimension = "store"
-            buildConfigField("boolean", "BACKGROUND_TRACKING", "false")
         }
     }
 
@@ -58,7 +44,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -103,9 +89,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.navigation.compose)
-    // Play: the text recognition model comes from Play services, so the bundle carries no native OCR libraries
-    "githubImplementation"(libs.mlkit.text.recognition)
-    "playImplementation"(libs.mlkit.text.recognition.play)
+    implementation(libs.mlkit.text.recognition)
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(platform(libs.compose.bom))

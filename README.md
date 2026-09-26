@@ -14,6 +14,8 @@ inspired by HSReplay.net and HearthPwn.
 It tracks your games while you play Hearthstone on the same device: it reads the screen with on-device text
 recognition, so it needs **no root, no Shizuku, no PC and no helper app**.
 
+**[Install](#installation)** – as an APK, from its own F-Droid repository or with Obtainium.
+
 ## Highlights
 
 - **Automatic tracking** – game start, both classes, your mulligan and draws, your deck, the opponent's played
@@ -103,14 +105,23 @@ all texts live in `app/src/main/res/values*/strings.xml`.
 
 ## Installation
 
-Download the APK from the latest [GitHub release](https://github.com/stroexd/hs-deck-tracker-android/releases) and
-install it (allow installing from unknown sources). Releases are signed with the same key, so updates install over
-the previous version. A Google Play version is being prepared; it tracks via screen sharing only, because Play
-restricts accessibility services.
+<p>
+  <a href="https://github.com/stroexd/hs-deck-tracker-android/releases/latest/download/hs-deck-tracker.apk"><img src="https://img.shields.io/github/v/release/stroexd/hs-deck-tracker-android?label=APK&logo=github&style=for-the-badge" alt="Download the APK" height="40"></a>
+  <a href="https://github.com/stroexd/hs-deck-tracker-android/tree/fdroid"><img src="https://img.shields.io/badge/F--Droid-repository-1976D2?logo=fdroid&logoColor=white&style=for-the-badge" alt="F-Droid repository" height="40"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.stroexd.hsdecktracker%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstroexd%2Fhs-deck-tracker-android%22%2C%22author%22%3A%22stroexd%22%2C%22name%22%3A%22HS%20Deck%20Tracker%22%7D"><img src="docs/badges/obtainium.png" alt="Get it on Obtainium" height="40"></a>
+</p>
+
+The same signed APK comes three ways – pick one:
+
+| | How | Updates |
+|---|---|---|
+| **GitHub** | [Download the APK](https://github.com/stroexd/hs-deck-tracker-android/releases/latest/download/hs-deck-tracker.apk) on the phone and open it (allow your browser to install apps) | download the new version, it installs over the old one |
+| **F-Droid repository** | In F-Droid, Droid-ify or Neo Store: Settings → Repositories → + and add `https://raw.githubusercontent.com/stroexd/hs-deck-tracker-android/fdroid/repo` – or scan the QR code on the [repository page](https://github.com/stroexd/hs-deck-tracker-android/tree/fdroid), which also shows the key fingerprint | through the app store |
+| **Obtainium** | [Add to Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.stroexd.hsdecktracker%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fstroexd%2Fhs-deck-tracker-android%22%2C%22author%22%3A%22stroexd%22%2C%22name%22%3A%22HS%20Deck%20Tracker%22%7D) – it installs straight from the GitHub releases | through Obtainium |
 
 Requires Android 8.0 or newer (background tracking: Android 11). For background tracking tap **Set up** in the app
-and turn on "HS Deck Tracker" under Accessibility. If Android shows it greyed out ("restricted setting", because the
-APK doesn't come from an app store): App info → ⋮ → **Allow restricted settings**, then try again.
+and turn on "HS Deck Tracker" under Accessibility. If Android shows it greyed out ("restricted setting", mostly after
+installing from the browser): App info → ⋮ → **Allow restricted settings**, then try again.
 
 ## Privacy
 
@@ -134,7 +145,7 @@ Full policy: [PRIVACY.md](PRIVACY.md).
 | Module | Contents |
 |---|---|
 | `core/` | Pure Kotlin/JVM: deck code codec, card database, collection import, crafting, meta parsing, opponent prediction, statistics, persistence and the screen recognition state machine (`vision/`) |
-| `app/` | Android app: Jetpack Compose + Material 3 UI, overlay, screen capture (screen sharing or accessibility screenshots) and ML Kit text recognition; flavors `github` and `play` |
+| `app/` | Android app: Jetpack Compose + Material 3 UI, overlay, screen capture (screen sharing or accessibility screenshots) and ML Kit text recognition |
 
 The recognition logic lives in `core` and is tested without a device. With diagnostics enabled the app records a
 session (recognized text per frame); such a session can be replayed on the desktop:
