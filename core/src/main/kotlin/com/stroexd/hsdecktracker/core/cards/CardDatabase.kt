@@ -4,7 +4,11 @@ import com.stroexd.hsdecktracker.core.util.AppJson
 import com.stroexd.hsdecktracker.core.util.normalizeForSearch
 import kotlinx.serialization.builtins.ListSerializer
 
-class CardDatabase(val allCards: List<Card>, val locale: String = "enUS") {
+class CardDatabase(
+    val allCards: List<Card>,
+    val locale: String = "enUS",
+    private val setNames: Map<String, String> = emptyMap(),
+) {
     private val byDbf: Map<Int, Card> = allCards.associateBy { it.dbfId }
     private val byCardId: Map<String, Card> = allCards.associateBy { it.id }
     private val byName: Map<String, List<Card>> = allCards.groupBy { normalizeForSearch(it.name) }
@@ -44,6 +48,12 @@ class CardDatabase(val allCards: List<Card>, val locale: String = "enUS") {
     }
 
     fun cardsInSet(set: String): List<Card> = deckCards.filter { it.set == set }
+
+    fun setName(set: String): String = setNames[set] ?: CardSets.displayName(set)
+
+    fun hasSetName(set: String): Boolean = set in setNames || CardSets.hasBuiltInName(set)
+
+    fun withSetNames(names: Map<String, String>): CardDatabase = CardDatabase(allCards, locale, names)
 
     companion object {
         val EMPTY = CardDatabase(emptyList())

@@ -72,6 +72,8 @@ object CardSets {
 
     fun displayName(set: String): String = names[set] ?: prettify(set)
 
+    fun hasBuiltInName(set: String): Boolean = set in names
+
     fun isStandardByDefault(set: String): Boolean =
         set !in wildSets && set != CLASSIC_SET && set !in nonConstructedSets
 
@@ -81,8 +83,17 @@ object CardSets {
         .ifBlank { set }
 }
 
-class FormatRules(private val standardOverrides: Map<String, Boolean> = emptyMap()) {
-    fun isStandardSet(set: String): Boolean = standardOverrides[set] ?: CardSets.isStandardByDefault(set)
+/** Manual overrides first, then what the current meta shows, then the built-in list (new sets count as Standard). */
+class FormatRules(
+    private val standardOverrides: Map<String, Boolean> = emptyMap(),
+    private val detectedStandard: Set<String> = emptySet(),
+    private val detectedWild: Set<String> = emptySet(),
+) {
+    fun isStandardSet(set: String): Boolean = standardOverrides[set] ?: when (set) {
+        in detectedStandard -> true
+        in detectedWild -> false
+        else -> CardSets.isStandardByDefault(set)
+    }
 
     fun isLegal(card: Card, format: GameFormat): Boolean = when (format) {
         GameFormat.STANDARD -> isStandardSet(card.set)

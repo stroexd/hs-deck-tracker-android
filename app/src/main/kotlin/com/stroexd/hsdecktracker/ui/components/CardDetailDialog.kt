@@ -44,6 +44,7 @@ import com.stroexd.hsdecktracker.ui.theme.uiColor
 fun CardDetailDialog(
     card: Card,
     locale: String,
+    setName: String,
     onDismiss: () -> Unit,
     owned: Int? = null,
     onOwnedChange: ((Int) -> Unit)? = null,
@@ -84,7 +85,7 @@ fun CardDetailDialog(
                     )
                 }
                 HorizontalDivider(Modifier.padding(vertical = 10.dp))
-                KeyValue(stringResource(R.string.card_set), CardSets.displayName(card.set))
+                KeyValue(stringResource(R.string.card_set), setName)
                 if (card.tribes.isNotEmpty()) KeyValue(stringResource(R.string.card_tribe), card.tribes.joinToString { it.lowercase().replaceFirstChar(Char::uppercase) })
                 if (card.isCraftable) {
                     KeyValue(

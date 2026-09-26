@@ -47,6 +47,9 @@ data class AppSettings(
     val detectedGameLocale: String? = null,
     val coreSetOwned: Boolean = true,
     val standardSetOverrides: Map<String, Boolean> = emptyMap(),
+    /** Detected from the sets current Standard decks use; empty until meta data was loaded. */
+    val detectedStandardSets: Set<String> = emptySet(),
+    val detectedWildSets: Set<String> = emptySet(),
     val metaSource: MetaSourceType = MetaSourceType.HSREPLAY,
     val metaRankRange: RankRange = RankRange.BRONZE_THROUGH_GOLD,
     val metaTimeRange: TimeRange = TimeRange.CURRENT_PATCH,
@@ -59,7 +62,7 @@ data class AppSettings(
     val showRecognitionDebug: Boolean = false,
     val recordDiagnostics: Boolean = false,
 ) {
-    val formatRules: FormatRules get() = FormatRules(standardSetOverrides)
+    val formatRules: FormatRules get() = FormatRules(standardSetOverrides, detectedStandardSets, detectedWildSets)
     val collectionOptions: CollectionOptions get() = CollectionOptions(coreSetOwned = coreSetOwned)
 
     /** Card data and app language: the chosen one, otherwise Hearthstone's, otherwise the device's. */

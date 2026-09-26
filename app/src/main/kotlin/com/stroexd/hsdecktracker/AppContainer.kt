@@ -20,7 +20,9 @@ import com.stroexd.hsdecktracker.core.data.MetaState
 import com.stroexd.hsdecktracker.core.data.SettingsRepository
 import com.stroexd.hsdecktracker.core.deck.Deck
 import com.stroexd.hsdecktracker.core.meta.DeckPrediction
+import com.stroexd.hsdecktracker.core.meta.FormatDetection
 import com.stroexd.hsdecktracker.core.meta.MetaDeck
+import com.stroexd.hsdecktracker.core.meta.MetaSnapshot
 import com.stroexd.hsdecktracker.core.meta.OpponentPredictor
 import com.stroexd.hsdecktracker.core.stats.MatchResult
 import com.stroexd.hsdecktracker.core.tracker.GameEvent
@@ -40,6 +42,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -98,7 +101,7 @@ class AppContainer(context: Context) {
     val tracker = TrackerController()
 
     /** English names are always recognized too: many play with an English client. */
-    private val cardsEnglish = CardRepository(cacheDir, http)
+    private val cardsEnglish = CardRepository(cacheDir, http, withSetNames = false)
 
     /** Hearthstone locale (e.g. "deDE") used for card data and the app language. */
     val gameLocale: StateFlow<String> = settings.settings
@@ -133,10 +136,31 @@ class AppContainer(context: Context) {
             }
         }
         appScope.launch { appLocale.collect { Locale.setDefault(it) } }
+        appScope.launch {
+            combine(meta.state, cards.state) { metaState, cardState -> metaState.snapshots[GameFormat.STANDARD] to cardState.db }
+                .collect { (snapshot, db) -> followRotation(snapshot, db) }
+        }
         tracker.deckCandidates = {
             decks.decks.value.sortedByDescending { it.updatedAt } + metaDecks().map { it.toDeck(0) }
         }
         tracker.preferredOpponentIds = { metaDecks().flatMapTo(HashSet()) { it.cards.keys } }
+    }
+
+    /** New sets and rotations arrive without an app update: a new game build brings the cards, the meta the rotation. */
+    fun checkForUpdates() {
+        appScope.launch {
+            cards.checkForUpdate()
+            if (gameLocale.value != GameLocales.ENGLISH) cardsEnglish.checkForUpdate()
+            meta.refresh(GameFormat.STANDARD, settings.value, cards.db)
+        }
+    }
+
+    private suspend fun followRotation(snapshot: MetaSnapshot?, db: CardDatabase) {
+        if (snapshot == null || !snapshot.fromHsReplay) return
+        val detected = FormatDetection.fromStandardDecks(snapshot.decks, db) ?: return
+        val current = settings.value
+        if (current.detectedStandardSets == detected.standard && current.detectedWildSets == detected.wild) return
+        settings.update { it.copy(detectedStandardSets = detected.standard, detectedWildSets = detected.wild) }
     }
 
     fun refreshCards() {
@@ -182,7 +206,7 @@ class AppContainer(context: Context) {
         frameCount = 0
         ocrFrameCount = 0
         _recognition.value = RecognitionStatus(active = true, scan = _recognition.value.scan)
-        appScope.launch { meta.refresh(GameFormat.STANDARD, settings.value, cards.db) }
+        checkForUpdates()
     }
 
     fun onRecognitionStopped() {

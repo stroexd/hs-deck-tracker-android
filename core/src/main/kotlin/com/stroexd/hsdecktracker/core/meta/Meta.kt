@@ -61,7 +61,9 @@ data class MetaSnapshot(
     val fetchedAt: Long = 0,
     val source: String = "",
     val description: String = "",
-)
+) {
+    val fromHsReplay: Boolean get() = description.startsWith("hsreplay|")
+}
 
 class MetaParseException(message: String) : IllegalArgumentException(message)
 

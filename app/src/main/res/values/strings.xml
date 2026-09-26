@@ -461,7 +461,8 @@
     <string name="custom_url_hint">E.g. a GitHub gist (raw link) with deck codes. Lines \"### Name\" before a code are used as deck name.</string>
     <string name="standard_format">Standard format</string>
     <string name="which_sets_standard">Which sets are Standard?</string>
-    <string name="standard_sets_hint">Adjust after a rotation. Standard: %1$s</string>
+    <string name="standard_sets_hint">Built-in list until meta data has been loaded. Standard: %1$s</string>
+    <string name="standard_sets_detected">Detected from the sets current Standard decks play, so it follows every rotation by itself. Standard: %1$s</string>
     <string name="reset_to_default">Reset to default</string>
     <string name="set_manually">set manually</string>
     <string name="opacity">Opacity: %1$d %%</string>

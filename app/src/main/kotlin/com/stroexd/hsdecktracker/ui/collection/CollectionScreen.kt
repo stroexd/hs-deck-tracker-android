@@ -379,7 +379,7 @@ fun CollectionScreen(navController: NavHostController) {
                 }
             }
             items(summary?.sets.orEmpty(), key = { "set-" + it.set }) { progress ->
-                SetProgressRow(progress, showOwnership = !collection.isEmpty) {
+                SetProgressRow(progress, db.setName(progress.set), showOwnership = !collection.isEmpty) {
                     navController.navigate(Routes.set(progress.set))
                 }
             }
@@ -429,7 +429,7 @@ fun CollectionScreen(navController: NavHostController) {
 }
 
 @Composable
-private fun SetProgressRow(progress: SetProgress, showOwnership: Boolean, onClick: () -> Unit) {
+private fun SetProgressRow(progress: SetProgress, name: String, showOwnership: Boolean, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -437,7 +437,7 @@ private fun SetProgressRow(progress: SetProgress, showOwnership: Boolean, onClic
     ) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(progress.displayName, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 if (showOwnership) {
                     Text(formatPercent(progress.fraction, 0), style = MaterialTheme.typography.labelLarge)
                 } else {
