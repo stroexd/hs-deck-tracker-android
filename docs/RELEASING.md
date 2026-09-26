@@ -12,8 +12,9 @@ the keys never leave the workflow unencrypted.
 
 ## Every release
 
-Actions → **Release** → Run workflow. Without a version it takes the next patch version; a tag like `v1.4.0` works
-too. The workflow
+Raise `versionName` in `app/build.gradle.kts` (for example in the pull request) – when it reaches `main`, the
+**Release** workflow publishes it. It can also be started by hand (Actions → Release → Run workflow; without a
+version it takes the next patch version) or with a tag like `v1.4.0`. The workflow
 
 1. runs the tests and builds the APK with version code `major·10000 + minor·100 + patch`, signed with the key
    `release`,
