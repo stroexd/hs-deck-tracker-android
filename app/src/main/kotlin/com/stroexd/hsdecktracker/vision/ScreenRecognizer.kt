@@ -2,38 +2,66 @@ package com.stroexd.hsdecktracker.vision
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.hardware.display.DisplayManager
-import android.hardware.display.VirtualDisplay
-import android.media.Image
-import android.media.ImageReader
-import android.media.projection.MediaProjection
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
 import android.os.SystemClock
-import android.util.DisplayMetrics
-import android.view.WindowManager
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.stroexd.hsdecktracker.appContainer
 import com.stroexd.hsdecktracker.core.vision.OcrFrame
 import com.stroexd.hsdecktracker.core.vision.OcrLine
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.min
 
 data class CapturePacing(val intervalMillis: Long, val maxReuseMillis: Long)
 
+/** Connects a frame source to the app: recognition, diagnostics and the recognition status. */
+fun Context.startScreenRecognition(
+    source: FrameSource,
+    maskProvider: () -> Rect?,
+    isActive: () -> Boolean = { true },
+    onStopped: () -> Unit = {},
+): ScreenRecognizer {
+    val container = appContainer
+    val diagnostics = if (container.settings.value.recordDiagnostics) DiagnosticsRecorder(DiagnosticsRecorder.root(this)) else null
+    val recognizer = ScreenRecognizer(
+        context = this,
+        source = source,
+        isActive = isActive,
+        maskProvider = maskProvider,
+        pacing = { container.capturePacing() },
+        onFrame = { frame, bitmap, reused ->
+            val notes = diagnostics?.let { mutableListOf<String>() }
+            val events = container.onScreenFrame(frame, notes, reused)
+            diagnostics?.let { runCatching { it.record(frame, events, notes.orEmpty(), bitmap) } }
+        },
+        onStopped = {
+            container.onRecognitionStopped()
+            onStopped()
+        },
+    )
+    container.onRecognitionStarted()
+    recognizer.start()
+    return recognizer
+}
+
+/**
+ * Takes screenshots at a pace that depends on the game phase and reads them with on-device text recognition.
+ * Unchanged screens reuse the last result, and nothing is captured while [isActive] is false, the screen is off
+ * or the device is upright (Hearthstone only runs in landscape).
+ */
 class ScreenRecognizer(
     private val context: Context,
-    private val projection: MediaProjection,
+    private val source: FrameSource,
+    private val isActive: () -> Boolean,
     private val maskProvider: () -> Rect?,
     private val pacing: () -> CapturePacing,
     private val onFrame: (frame: OcrFrame, bitmap: Bitmap, reused: Boolean) -> Unit,
@@ -47,72 +75,27 @@ class ScreenRecognizer(
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val powerManager = context.getSystemService(PowerManager::class.java)
     private val stopped = AtomicBoolean(false)
-    private var reader: ImageReader? = null
-    private var virtualDisplay: VirtualDisplay? = null
 
-    private var awaitingFrame = false
     private var captureStartedAt = 0L
-    private var detachBetweenFrames = true
-    private var reattachWorks = false
-    private var reattached = false
-    private var timeouts = 0
-    private var bitmap: Bitmap? = null
     private var lastPrint: IntArray? = null
     private var lastLines: List<OcrLine>? = null
     private var lastOcrAt = 0L
 
     private val captureTask = Runnable { capture() }
-    private val frameTimeout = Runnable { onFrameTimeout() }
 
     fun start() {
-        projection.registerCallback(
-            object : MediaProjection.Callback() {
-                override fun onStop() {
-                    stop()
-                }
-            },
-            handler,
-        )
-        val (realWidth, realHeight) = realDisplaySize()
-        val landscapeWidth = max(realWidth, realHeight)
-        val landscapeHeight = min(realWidth, realHeight)
-        val scale = min(1f, MAX_WIDTH.toFloat() / landscapeWidth)
-        val width = ((landscapeWidth * scale).toInt() / 2) * 2
-        val height = ((landscapeHeight * scale).toInt() / 2) * 2
-        val imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
-        imageReader.setOnImageAvailableListener({ onImageAvailable(it) }, handler)
-        reader = imageReader
-        awaitingFrame = true
-        captureStartedAt = SystemClock.elapsedRealtime()
-        virtualDisplay = projection.createVirtualDisplay(
-            "hs-deck-tracker",
-            width,
-            height,
-            context.resources.displayMetrics.densityDpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader.surface,
-            null,
-            handler,
-        )
-        handler.postDelayed(frameTimeout, FRAME_TIMEOUT_MS)
+        handler.post {
+            val started = runCatching { source.start(handler) { stop() } }.isSuccess
+            if (started) capture() else stop()
+        }
     }
 
     fun stop() {
         if (!stopped.compareAndSet(false, true)) return
         handler.post {
             handler.removeCallbacks(captureTask)
-            handler.removeCallbacks(frameTimeout)
-            runCatching { virtualDisplay?.release() }
-            runCatching { reader?.close() }
-            virtualDisplay = null
-            reader = null
-            runCatching { projection.stop() }
-            val lastBitmap = bitmap
-            bitmap = null
-            worker.execute {
-                runCatching { recognizer.close() }
-                lastBitmap?.recycle()
-            }
+            runCatching { source.stop() }
+            worker.execute { runCatching { recognizer.close() } }
             worker.shutdown()
             thread.quitSafely()
             onStopped()
@@ -137,93 +120,44 @@ class ScreenRecognizer(
     private fun capture() {
         if (stopped.get()) return
         captureStartedAt = SystemClock.elapsedRealtime()
-        val (realWidth, realHeight) = realDisplaySize()
-        if (powerManager?.isInteractive == false || realWidth < realHeight) {
+        val (realWidth, realHeight) = realDisplaySize(context)
+        if (powerManager?.isInteractive == false || realWidth < realHeight || !isActive()) {
             handler.postDelayed(captureTask, INACTIVE_CHECK_MS)
             return
         }
-        awaitingFrame = true
-        if (detachBetweenFrames) {
-            val imageReader = reader ?: return
-            runCatching { imageReader.acquireLatestImage()?.close() }
-            virtualDisplay?.surface = imageReader.surface
-            reattached = true
-            handler.postDelayed(frameTimeout, FRAME_TIMEOUT_MS)
+        source.capture { capture ->
+            if (capture == null || stopped.get()) scheduleNext() else process(capture)
         }
     }
 
-    private fun onFrameTimeout() {
-        if (!awaitingFrame || stopped.get()) return
-        timeouts++
-        if (!reattachWorks && timeouts >= MAX_TIMEOUTS) {
-            detachBetweenFrames = false
-            virtualDisplay?.surface = reader?.surface
-            return
-        }
-        awaitingFrame = false
-        virtualDisplay?.surface = null
-        scheduleNext()
-    }
-
-    private fun onImageAvailable(imageReader: ImageReader) {
-        val image = try {
-            imageReader.acquireLatestImage()
-        } catch (e: IllegalStateException) {
-            null
-        } ?: return
-        if (stopped.get() || !awaitingFrame) {
-            image.close()
-            return
-        }
-        awaitingFrame = false
-        handler.removeCallbacks(frameTimeout)
-        timeouts = 0
-        if (reattached) reattachWorks = true
-        if (detachBetweenFrames) virtualDisplay?.surface = null
-        process(image)
-    }
-
-    private fun process(image: Image) {
-        val (realWidth, realHeight) = realDisplaySize()
-        val width = image.width
-        val height = image.height
+    private fun process(capture: Capture) {
+        val (realWidth, realHeight) = realDisplaySize(context)
+        val bitmap = capture.bitmap
+        val width = capture.width
+        val height = capture.height
         val mask = maskProvider()?.let { scaleMask(it, width, height, realWidth, realHeight) }
         val print = try {
-            fingerprint(image, mask)
+            fingerprint(capture, mask)
         } catch (e: Exception) {
-            image.close()
             scheduleNext()
             return
         }
         val now = SystemClock.elapsedRealtime()
         val previousLines = lastLines
         val previousPrint = lastPrint
-        val reusable = previousLines != null && previousPrint != null &&
-            now - lastOcrAt < pacing().maxReuseMillis && isSimilar(print, previousPrint)
-        val target = try {
-            if (reusable) bitmap else copyToBitmap(image)
-        } catch (e: Exception) {
-            null
-        } finally {
-            image.close()
-        }
-        if (target == null) {
-            scheduleNext()
-            return
-        }
         val aspect = width.toFloat() / height
-        if (reusable && previousLines != null) {
+        if (previousLines != null && previousPrint != null && now - lastOcrAt < pacing().maxReuseMillis && isSimilar(print, previousPrint)) {
             val frame = OcrFrame(System.currentTimeMillis(), previousLines, aspect)
             listenerExecutor.execute {
-                runCatching { onFrame(frame, target, true) }
+                runCatching { onFrame(frame, bitmap, true) }
                 handler.post { scheduleNext() }
             }
             return
         }
-        recognizer.process(InputImage.fromBitmap(target, 0))
+        recognizer.process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener(listenerExecutor) { text ->
                 val frame = toFrame(text, width, height, aspect, mask)
-                runCatching { onFrame(frame, target, false) }
+                runCatching { onFrame(frame, bitmap, false) }
                 handler.post {
                     lastLines = frame.lines
                     lastPrint = print
@@ -236,13 +170,10 @@ class ScreenRecognizer(
             }
     }
 
-    private fun fingerprint(image: Image, mask: Rect?): IntArray {
-        val plane = image.planes[0]
-        val buffer = plane.buffer
-        val rowStride = plane.rowStride
-        val pixelStride = plane.pixelStride
-        val cellWidth = image.width / GRID_X
-        val cellHeight = image.height / GRID_Y
+    /** Brightness of a coarse grid, the overlay left out: enough to notice whether anything changed. */
+    private fun fingerprint(capture: Capture, mask: Rect?): IntArray {
+        val cellWidth = capture.width / GRID_X
+        val cellHeight = capture.height / GRID_Y
         val result = IntArray(GRID_X * GRID_Y)
         for (gy in 0 until GRID_Y) {
             for (gx in 0 until GRID_X) {
@@ -256,11 +187,8 @@ class ScreenRecognizer(
                 var sum = 0
                 for (sy in 1..2) {
                     for (sx in 1..2) {
-                        val offset = (top + cellHeight * sy / 3) * rowStride + (left + cellWidth * sx / 3) * pixelStride
-                        val r = buffer.get(offset).toInt() and 0xFF
-                        val g = buffer.get(offset + 1).toInt() and 0xFF
-                        val b = buffer.get(offset + 2).toInt() and 0xFF
-                        sum += (r * 54 + g * 183 + b * 19) shr 8
+                        val pixel = capture.bitmap.getPixel(left + cellWidth * sx / 3, top + cellHeight * sy / 3)
+                        sum += (((pixel shr 16) and 0xFF) * 54 + ((pixel shr 8) and 0xFF) * 183 + (pixel and 0xFF) * 19) shr 8
                     }
                 }
                 result[index] = sum / 4
@@ -277,32 +205,6 @@ class ScreenRecognizer(
             if (abs(a[i] - b[i]) > CELL_THRESHOLD && ++changed > MAX_CHANGED_CELLS) return false
         }
         return true
-    }
-
-    private fun copyToBitmap(image: Image): Bitmap {
-        val plane = image.planes[0]
-        val bitmapWidth = plane.rowStride / plane.pixelStride
-        val current = bitmap?.takeIf { it.width == bitmapWidth && it.height == image.height && !it.isRecycled }
-        val target = current ?: Bitmap.createBitmap(bitmapWidth, image.height, Bitmap.Config.ARGB_8888).also {
-            bitmap?.recycle()
-            bitmap = it
-        }
-        plane.buffer.rewind()
-        target.copyPixelsFromBuffer(plane.buffer)
-        return target
-    }
-
-    private fun realDisplaySize(): Pair<Int, Int> {
-        val windowManager = context.getSystemService(WindowManager::class.java)
-        return if (Build.VERSION.SDK_INT >= 30) {
-            val bounds = windowManager.maximumWindowMetrics.bounds
-            bounds.width() to bounds.height()
-        } else {
-            val metrics = DisplayMetrics()
-            @Suppress("DEPRECATION")
-            windowManager.defaultDisplay.getRealMetrics(metrics)
-            metrics.widthPixels to metrics.heightPixels
-        }
     }
 
     private fun scaleMask(mask: Rect, frameWidth: Int, frameHeight: Int, realWidth: Int, realHeight: Int): Rect {
@@ -332,12 +234,9 @@ class ScreenRecognizer(
     }
 
     private companion object {
-        const val MAX_WIDTH = 2000
         const val MASK_MARGIN = 8
         const val MIN_GAP_MS = 50L
         const val INACTIVE_CHECK_MS = 3_000L
-        const val FRAME_TIMEOUT_MS = 700L
-        const val MAX_TIMEOUTS = 3
         const val GRID_X = 48
         const val GRID_Y = 27
         const val CELL_THRESHOLD = 20

@@ -87,6 +87,7 @@ fun TrackerPanel(
     predictions: List<DeckPrediction>,
     showOdds: Boolean,
     compact: Boolean,
+    showResultButtons: Boolean = true,
     onUpdate: ((TrackerState) -> TrackerState) -> Unit,
     onFinish: (MatchResult) -> Unit,
     onNewGame: () -> Unit,
@@ -136,28 +137,35 @@ fun TrackerPanel(
                 OpponentTab(state, db, predictions, compact, rowHeight, onUpdate, onTextInputChange)
             }
         }
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Button(
-                onClick = { onFinish(MatchResult.WIN) },
-                colors = ButtonDefaults.buttonColors(containerColor = HsColors.Win.copy(alpha = 0.85f)),
-                contentPadding = PaddingValues(horizontal = 8.dp),
-                modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
-            ) { Text(stringResource(R.string.win), fontSize = if (compact) 12.sp else 14.sp) }
-            Button(
-                onClick = { onFinish(MatchResult.LOSS) },
-                colors = ButtonDefaults.buttonColors(containerColor = HsColors.Loss.copy(alpha = 0.85f)),
-                contentPadding = PaddingValues(horizontal = 8.dp),
-                modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
-            ) { Text(stringResource(R.string.loss), fontSize = if (compact) 12.sp else 14.sp, maxLines = 1) }
-            OutlinedButton(
-                onClick = onNewGame,
-                contentPadding = PaddingValues(horizontal = 8.dp),
-                modifier = Modifier.height(if (compact) 34.dp else 42.dp),
-            ) { Text(stringResource(R.string.new_game), fontSize = if (compact) 12.sp else 14.sp) }
+        if (showResultButtons) {
+            ResultButtons(compact, onFinish, onNewGame)
         }
+    }
+}
+
+@Composable
+private fun ResultButtons(compact: Boolean, onFinish: (MatchResult) -> Unit, onNewGame: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Button(
+            onClick = { onFinish(MatchResult.WIN) },
+            colors = ButtonDefaults.buttonColors(containerColor = HsColors.Win.copy(alpha = 0.85f)),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
+        ) { Text(stringResource(R.string.win), fontSize = if (compact) 12.sp else 14.sp) }
+        Button(
+            onClick = { onFinish(MatchResult.LOSS) },
+            colors = ButtonDefaults.buttonColors(containerColor = HsColors.Loss.copy(alpha = 0.85f)),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            modifier = Modifier.weight(1f).height(if (compact) 34.dp else 42.dp),
+        ) { Text(stringResource(R.string.loss), fontSize = if (compact) 12.sp else 14.sp, maxLines = 1) }
+        OutlinedButton(
+            onClick = onNewGame,
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            modifier = Modifier.height(if (compact) 34.dp else 42.dp),
+        ) { Text(stringResource(R.string.new_game), fontSize = if (compact) 12.sp else 14.sp) }
     }
 }
 
@@ -244,7 +252,7 @@ private fun UnknownDeck(
     ) {
         item(key = "info") {
             Text(
-                stringResource(if (state.autoTracked) R.string.detecting_deck_hint else R.string.no_deck_selected),
+                stringResource(if (state.autoTracked) R.string.detecting_deck else R.string.no_deck_selected),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(6.dp),
             )

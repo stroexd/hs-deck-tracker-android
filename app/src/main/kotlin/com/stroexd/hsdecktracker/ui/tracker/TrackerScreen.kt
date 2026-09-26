@@ -27,7 +27,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -36,7 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.stroexd.hsdecktracker.R
+import com.stroexd.hsdecktracker.overlay.BackgroundTracker
 import com.stroexd.hsdecktracker.overlay.OverlayLauncher
+import com.stroexd.hsdecktracker.overlay.rememberBackgroundTracking
 import com.stroexd.hsdecktracker.overlay.rememberTrackingStarter
 import com.stroexd.hsdecktracker.ui.LocalAppContainer
 import com.stroexd.hsdecktracker.ui.components.ClassBadge
@@ -56,6 +62,14 @@ fun TrackerScreen(navController: NavHostController) {
     val metaState by container.meta.state.collectAsStateWithLifecycle()
     val recognition by container.recognition.collectAsStateWithLifecycle()
     val startOverlay = rememberTrackingStarter()
+    val background = rememberBackgroundTracking()
+    var showBackgroundSetup by remember { mutableStateOf(false) }
+    LaunchedEffect(background) {
+        if (background) showBackgroundSetup = false
+    }
+    if (showBackgroundSetup) {
+        BackgroundSetupDialog(onDismiss = { showBackgroundSetup = false }, onUseScreenSharing = startOverlay)
+    }
 
     Scaffold(
         topBar = {
@@ -85,16 +99,34 @@ fun TrackerScreen(navController: NavHostController) {
         if (current == null) {
             LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 24.dp)) {
                 item {
+                    val needsSetup = !background && BackgroundTracker.isSupported
                     EmptyState(
                         icon = Icons.Filled.Style,
-                        title = stringResource(if (recognition.active) R.string.waiting_for_game else R.string.track_automatically),
-                        message = stringResource(
-                            if (recognition.active) R.string.waiting_for_game_message else R.string.track_automatically_message,
+                        title = stringResource(
+                            when {
+                                recognition.active -> R.string.waiting_for_game
+                                background -> R.string.background_tracking_on
+                                else -> R.string.track_automatically
+                            },
                         ),
-                        actions = {
-                            Button(onClick = { startOverlay() }) {
-                                Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                                Text(stringResource(R.string.play_and_track_button), Modifier.padding(start = 8.dp))
+                        message = if (!recognition.active && background) stringResource(R.string.just_open_hearthstone) else null,
+                        actions = if (recognition.active) {
+                            null
+                        } else {
+                            {
+                                Button(onClick = { if (needsSetup) showBackgroundSetup = true else startOverlay() }) {
+                                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                                    Text(
+                                        stringResource(
+                                            when {
+                                                background -> R.string.open_hearthstone
+                                                needsSetup -> R.string.set_up
+                                                else -> R.string.play_and_track_button
+                                            },
+                                        ),
+                                        Modifier.padding(start = 8.dp),
+                                    )
+                                }
                             }
                         },
                     )

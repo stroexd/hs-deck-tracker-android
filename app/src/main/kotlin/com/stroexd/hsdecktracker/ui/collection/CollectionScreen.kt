@@ -474,15 +474,7 @@ private fun ImportHelpCard() {
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.supported_formats), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text(
-                stringResource(R.string.supported_formats_list),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                stringResource(R.string.collection_tip),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(stringResource(R.string.supported_formats_list), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

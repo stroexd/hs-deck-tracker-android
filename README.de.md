@@ -28,7 +28,11 @@ Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hil
 ## Funktionen
 
 ### Automatischer Tracker & Overlay
-- **Spielen & tracken** antippen (Startseite oder App-Symbol lange drücken): Hearthstone startet, der Rest läuft automatisch.
+- **Läuft im Hintergrund (Android 11+):** einmal einrichten, dann einfach Hearthstone öffnen – das Overlay erscheint,
+  Partien werden getrackt und samt Ergebnis gespeichert, ohne Knopf und ohne Bildschirmfreigabe-Abfrage. Dafür nutzt
+  die App ihre eigene Bedienungshilfe, die nur erkennt, welche App vorne ist, und nur Screenshots macht, solange
+  Hearthstone vorne ist.
+- Ohne sie: **Spielen & tracken** antippen und die Bildschirmfreigabe einmal pro Sitzung erlauben.
 - Die Erkennung nutzt ML Kit **auf dem Gerät** – kein Bildschirmfoto verlässt das Handy.
   - Spielstart am Versus-Bildschirm bzw. beim Mulligan – der Tracker startet von selbst.
   - **Beide Klassen** werden von den Namensschildern gelesen.
@@ -41,8 +45,6 @@ Texterkennung auf dem Gerät – **ohne Root, ohne Shizuku, ohne PC und ohne Hil
   abgekoppelt; unveränderte Bilder sparen sich die Texterkennung; Pause bei ausgeschaltetem Bildschirm oder im
   Hochformat; im Stromsparmodus bzw. bei Überhitzung automatisch langsamer.
 - Verschiebbares, minimierbares Overlay; jede Erkennung lässt sich per Antippen korrigieren.
-- Android fragt einmal pro Sitzung nach der Bildschirmaufnahme (Systemvorgabe) und einmalig nach
-  „Über anderen Apps einblenden“.
 
 ### Sammlung & Herstellen
 - **Aus Hearthstone synchronisieren:** Sammlung im Spiel öffnen und durchblättern – die App liest Kartennamen und
@@ -106,10 +108,15 @@ Jeder Push baut per GitHub Actions APKs: **Actions → Android CI → neuester L
 `hs-deck-tracker-apk` herunterladen, entpacken und `app-release.apk` installieren (Installation aus unbekannten
 Quellen erlauben).
 
-Benötigt Android 8.0 oder neuer; die Erkennung funktioniert am besten im Querformat mit Hearthstone im Vollbild.
+Benötigt Android 8.0 oder neuer (Hintergrund-Tracking: Android 11). Fürs Hintergrund-Tracking in der App auf
+**Einrichten** tippen und unter Bedienungshilfen „HS Deck Tracker“ einschalten. Ist der Eintrag ausgegraut
+(„eingeschränkte Einstellung“, weil die APK nicht aus einem App-Store kommt): App-Info → ⋮ → **Eingeschränkte
+Einstellungen zulassen**, dann erneut versuchen.
 
 ## Datenschutz
 
+- Die Bedienungshilfe liest nur, welche App vorne ist, und macht nur Screenshots, solange Hearthstone vorne ist;
+  Inhalte anderer Apps liest sie nie.
 - Bildschirminhalte werden **nur auf dem Gerät** verarbeitet und nicht gespeichert – außer im Diagnose-Modus, der
   erkannte Texte und einige verkleinerte Bildschirmfotos lokal ablegt, bis du sie teilst oder löschst.
 - Netzwerkzugriffe gibt es nur für Kartendaten und -bilder (HearthstoneJSON), Set-Namen (HearthSims Kopie der
